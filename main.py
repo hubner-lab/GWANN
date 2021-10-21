@@ -4,7 +4,6 @@ import sys
 import io
 import os
 
-
 import torch
 import torch.nn as nn
 import torch.nn.functional as F 
@@ -28,7 +27,6 @@ import scipy.stats as stats
 import seaborn as sns
 
 import allel
-from cyvcf2 import VCF
 
 import sklearn
 import cv2
@@ -57,8 +55,9 @@ def cli1():
 @click.option('-w', '--width','width',default=10,type=int)
 @click.option('--seed','seed',default=random.randrange(sys.maxsize),type=int)
 @click.option('--model','model',default="models/net.pt")
+@click.option('--output','output_path',default="results/GWAS.png")
 
-def run(vcf,pheno_path,n_samples,width,seed,model):
+def run(vcf,pheno_path,n_samples,width,seed,model,output_path):
     """Run"""
 
     from net import Net
@@ -80,16 +79,15 @@ def run(vcf,pheno_path,n_samples,width,seed,model):
 
     # tmp_vcf = np.empty(vcf[:,:,0].shape)
     tmp_vcf = (vcf[:,:,0] + vcf[:,:,1]) / 2
-    tmp_vcf[np.where(tmp_vcf == 0.5)] = 0 
+    # tmp_vcf[np.where(tmp_vcf == 0.5)] = 0 
 
     final_vcf = torch.from_numpy(tmp_vcf).float().to(device)
 
-    n_snps = final_vcf.shape[0]
+    n_snps = final_vcf.shape[0] // 4
 
     if not Path(pheno_path).is_file():
         print("Invalid file pheno")
         exit(1)
-
 
     pheno = pd.read_csv(pheno_path,index_col=None,header=None,sep=' ')
     pheno_sorted = pheno.sort_values(by=[2])
@@ -115,6 +113,7 @@ def run(vcf,pheno_path,n_samples,width,seed,model):
             pad_samples = n_samples - input_s[j].shape[1]
             pad_2 = torch.zeros((n_snps,pad_samples)).float().to(device) 
             input = torch.cat((pad_2,input_tmp),1)
+            input = torch.unsqueeze(input,0)
 
             outputs = net(input)
 
@@ -131,10 +130,12 @@ def run(vcf,pheno_path,n_samples,width,seed,model):
     chrom_labels.sort(key=num_sort)
     chr_loc = []
 
-    output[np.where(output <= 0)] = 0
- 
+
+    min = 0
+    print(100 * (torch.count_nonzero(output > min)/output.shape[0]).item())
 
     color = ""
+    output[np.where(output <= min)] = min
 
     for chr in chrom_labels:
         if color == "blue":
@@ -151,14 +152,14 @@ def run(vcf,pheno_path,n_samples,width,seed,model):
     ax.set_xticklabels(chrom_labels)
     plt.setp(ax.get_xticklabels(), rotation=70, horizontalalignment='right')
     fig.tight_layout()
-    fig.savefig('results/GWAS.png')
+    fig.savefig(output_path)
 
 
 
 
-def simulate_helper(genome_command,phenosim_command,i):
+def simulate_helper(genome_command,phenosim_command,seed,i):
     out_file = open('simulation/data/genome{0}.txt'.format(i),'w')
-    subprocess.call(genome_command,stdout=out_file)
+    subprocess.call(genome_command + ["{0}".format(seed[i])],stdout=out_file)
     out_file.close()
 
     phenosim_command = shlex.split(phenosim_command.format(i))
@@ -180,7 +181,12 @@ def cli2():
 
 def simulate(pop,n_samples,n_sim,n_snps,maf,miss,equal):
     """Simulate"""
+
+    seed_arr = np.array(list(range(pop))) + np.random.randint(1,1000000)
+    np.random.shuffle(seed_arr)
+
     seed = 0
+
     torch.manual_seed(seed)
     random.seed(seed)
     np.random.seed(seed)
@@ -189,7 +195,7 @@ def simulate(pop,n_samples,n_sim,n_snps,maf,miss,equal):
     cpus = multiprocessing.cpu_count()
     pool = multiprocessing.Pool(cpus)
 
-    genome_command = shlex.split("simulation/genome/genome -s {pop} -pop 1 {samples}".format(pop=pop,samples=n_samples))
+    genome_command = shlex.split("simulation/genome/genome -s {pop} -pop 1 {samples} -seed".format(pop=pop,samples=n_samples))
     phenosim_command = "python2 simulation/phenosim/phenosim.py -i G -f simulation/data/genome{{0}}.txt --outfile simulation/data/{{0}} --maf_r {maf},1.0 --maf_c {maf} --miss {miss}".format(maf=maf,miss=miss)
 
     if n_snps > 1:
@@ -204,7 +210,7 @@ def simulate(pop,n_samples,n_sim,n_snps,maf,miss,equal):
         var_str = re.sub("\[|\s*|\]","",var_str)
         phenosim_command += " -n {snps} -v {var}".format(snps=n_snps,var=var_str)
 
-    ss = partial(simulate_helper,genome_command,phenosim_command)
+    ss = partial(simulate_helper,genome_command,phenosim_command,seed_arr)
     pool.map(ss,range(n_sim))
 
 
@@ -227,7 +233,7 @@ def train(epochs,n_samples,n_snps,batch,ratio,width,path,deterministic,debug):
     """Train"""
 
     from net import Net
-    from dataset  import DatasetPhenosim
+    from dataset  import DatasetPhenosim,DatasetPhenosim
     
 
     device = torch.device("cuda:0" if torch.cuda.is_available() else "cpu")
@@ -241,12 +247,14 @@ def train(epochs,n_samples,n_snps,batch,ratio,width,path,deterministic,debug):
         generator.manual_seed(0)
 
         torch.use_deterministic_algorithms(True)
-        os.environ["CUBLAS_WORKSPACE_CONFIG"]=":4096:8"
+        os.environ["CUBLAS_WORKSPACE_CONFIG"]=":16:8"
+        # os.environ["CUBLAS_WORKSPACE_CONFIG"]=":4096:8"
         # if not torch.backends.cudnn.deterministic: 
             # exit(1)
 
 
     full_dataset = DatasetPhenosim(n_samples,n_snps,path)
+
 
     train_size = int(ratio * len(full_dataset))
     test_size =  len(full_dataset) - train_size
@@ -260,6 +268,8 @@ def train(epochs,n_samples,n_snps,batch,ratio,width,path,deterministic,debug):
     net = Net(n_snps,n_samples,batch,width).to(device)
 
     if debug:
+        print(torch.version.cuda)
+        print(torch.backends.cudnn.version())
         print(net)
         print(device)
         print("SNPs: {0} , samples: {1}, batch: {2} , width : {3}".format(n_snps,n_samples,batch,width))
@@ -274,24 +284,22 @@ def train(epochs,n_samples,n_snps,batch,ratio,width,path,deterministic,debug):
 
     # m = nn.Sigmoid()
 
-    optimizer = optim.SGD(net.parameters(), lr=1e-2,momentum=0.9,weight_decay=1e-5)
+    optimizer = optim.SGD(net.parameters(), lr=1e-1,momentum=0.9,weight_decay=1e-5)
     scheduler = optim.lr_scheduler.ExponentialLR(optimizer,gamma=0.99)
 
     min_loss = np.Infinity
 
     if debug:
         max_accuracy = 0
-        max_recall = 0
-        max_F1 = 0
-        max_precision = 0
     
     if not Path("models").is_dir():
         Path.mkdir("models")
 
-    clip_grad_norm = 5
+    # clip_grad_norm = np.inf 
+    clip_grad_norm = 5 
     e = 0
 
-    plot_average = False 
+    plot_average = True 
 
     if plot_average:
         fig,ax = plt.subplots(2,2)
@@ -325,6 +333,9 @@ def train(epochs,n_samples,n_snps,batch,ratio,width,path,deterministic,debug):
     
 
         net.eval()
+        if debug:
+            full_dataset.eval_()
+
         with torch.no_grad():
             for i,data in enumerate(dataloader_test):
 
@@ -339,50 +350,32 @@ def train(epochs,n_samples,n_snps,batch,ratio,width,path,deterministic,debug):
 
                 if debug:
                     x = inputs.detach().clone() 
-                    x = x.view(batch,n_snps,width,-1)
-                    x = x.view(batch*n_snps,width,-1)
+                    tmp_n_snps = x.shape[1]
+                    x = x.view(batch,tmp_n_snps,width,-1)
+                    x = x.view(batch*tmp_n_snps,width,-1)
                     x = torch.unsqueeze(x,1)
 
 
-                    pred_copy = pred.detach().clone().to(torch.int8).flatten()
+                    pred_copy = pred.detach().clone().flatten()
                     outputs_copy = outputs.detach().clone().flatten()
 
-                    # outputs_copy = torch.argmax(outputs_copy,2)
-                    # pred_copy = torch.argmax(pred_copy,2)
+                    # outputs_copy = torch.sign(outputs_copy)
+                    ind_tmp = (outputs_copy >= 0).nonzero()
+                    ind_tmp_2 = (outputs_copy < 0).nonzero()
+
+                    if deterministic:
+                        outputs_copy[ind_tmp] = torch.ones(outputs_copy[ind_tmp].shape).to(device)  # cuda problem when CUBLAS_WORKSPACE_CONFIG=":16:8"
+                        outputs_copy[ind_tmp_2] = - torch.ones(outputs_copy[ind_tmp_2].shape).to(device) 
+                    else:
+                        outputs_copy[ind_tmp] = 1.
+                        outputs_copy[ind_tmp_2] = -1.
 
 
-                    input_copy2 = inputs.detach().clone().cpu()
-                    input_copy2 = input_copy2.view(batch*n_snps,-1)
-                    pred_copy_2 = pred.detach().clone().flatten().to(torch.int8).cpu()
-                    a = input_copy2[np.where(pred_copy_2 == 1)]
-
-                    s = torch.argmin(torch.abs_((a == 1).sum(dim = 1) / 100 - 0.3))
-
-                    fig, ax = plt.subplots()
-                    ax.axis('off')
-
-
-                    ax.matshow(a[s].view(width,-1))
-                    fig.savefig('results/SNP2.png', format='png', dpi=1200, bbox_inches='tight')
-                    ax.matshow(a[s].view(-1,1))
-                    fig.savefig('results/SNP1.png', format='png', dpi=1200, bbox_inches='tight')
-
-                    idx = torch.randperm(a[s].nelement())
-                    print(idx)
-                    ax.matshow(a[s,idx].view(-1,1))
-                    fig.savefig('results/SNP0.png', format='png', dpi=1200, bbox_inches='tight')
-
-
-
-
-
-                    exit(0)
-
-                    false_ind = torch.where(torch.sign(outputs_copy) != pred_copy)
+                    false_ind = torch.where(outputs_copy != pred_copy)
                     false = pred_copy[false_ind]
                     false_ind = false_ind[0]
                     
-                    true_ind = torch.where(torch.sign(outputs_copy) == pred_copy)
+                    true_ind = torch.where(outputs_copy == pred_copy)
                     true = pred_copy[true_ind]
                     true_ind = true_ind[0]
 
@@ -413,11 +406,11 @@ def train(epochs,n_samples,n_snps,batch,ratio,width,path,deterministic,debug):
             TN_arr[e] = n_TN
             FN_arr[e] = n_FN
 
-            # print("FP: {0}, FN : {1}, TP: {2}, TN: {3}".format(n_FP,n_FN,n_TP,n_TN))
+            print("FP: {0}, FN : {1}, TP: {2}, TN: {3}".format(n_FP,n_FN,n_TP,n_TN))
             accuracy = 100.0*(n_TP+n_TN)/(n_FP+n_FN+n_TN+n_TP)
             recall = 100.0*(n_TP/(n_TP+n_FN)) if n_TP + n_FN >0 else 0
             precision = 100.0*(n_TP/(n_TP+n_FP)) if n_TP + n_FP >0 else 0
-            F1 = 100.0*(2.0*n_TP/(2.0*n_TP+n_FP+n_FN)) 
+            F1 = 100.0*(2.0*n_TP/(2.0*n_TP+n_FP+n_FN)) if n_TP + n_FP + n_FN > 0 else 0 
             print("Epoch : {0}, Accuracy: {1:.2f}, Recall: {2:.2f}, Precision: {3:.2f} F1: {4:.2f}, loss : {5:.5f}".format(
                 e,
                 accuracy,
@@ -427,6 +420,7 @@ def train(epochs,n_samples,n_snps,batch,ratio,width,path,deterministic,debug):
                 loss_arr[e] 
             ))
 
+
             if max_accuracy < accuracy:
                 accuracy =max_accuracy
                 torch.save({
@@ -434,28 +428,7 @@ def train(epochs,n_samples,n_snps,batch,ratio,width,path,deterministic,debug):
                     'optimizer_state_dict': optimizer.state_dict(),
                 }, "models/net-accuracy.pt")
 
-            if max_precision < precision:
-                precision = max_precision
-                torch.save({
-                    'model_state_dict': net.state_dict(),
-                    'optimizer_state_dict': optimizer.state_dict(),
-                }, "models/net-precision.pt")
-
-            if max_recall < recall:
-                recall = max_recall
-                torch.save({
-                    'model_state_dict': net.state_dict(),
-                    'optimizer_state_dict': optimizer.state_dict(),
-                }, "models/net-recall.pt")
-
-            if max_F1 < F1:
-                F1 = max_F1
-                torch.save({
-                    'model_state_dict': net.state_dict(),
-                    'optimizer_state_dict': optimizer.state_dict(),
-                }, "models/net-F1.pt")
-    
-            if plot_average and e % 100 == 0:
+            if plot_average and e % 20 == 0:
                 ax[0,0].clear()
                 ax[0,1].clear()
                 ax[1,0].clear()
@@ -474,6 +447,9 @@ def train(epochs,n_samples,n_snps,batch,ratio,width,path,deterministic,debug):
                 fig.savefig('results/matrix.png'.format(e=e))
 
      
+        else:
+            print("Epoch: {0}".format(e))
+
         if total_loss/times < min_loss:
             min_loss  = total_loss/times
             torch.save({
@@ -481,6 +457,7 @@ def train(epochs,n_samples,n_snps,batch,ratio,width,path,deterministic,debug):
                 'optimizer_state_dict': optimizer.state_dict(),
             }, "models/net.pt")
     
+        full_dataset.train()
         net.train()
         for i,data in enumerate(dataloader_train):
             optimizer.zero_grad()
@@ -500,7 +477,7 @@ def train(epochs,n_samples,n_snps,batch,ratio,width,path,deterministic,debug):
 
 
     if debug:
-        data = {'TP':TP_arr,'TN':TN_arr,'FP':FP_arr,'FN':FN_arr}
+        data = {'TP':TP_arr,'TN':TN_arr,'FP':FP_arr,'FN':FN_arr,'loss':loss_arr}
         df_stats = pd.DataFrame(data)
         df_stats.to_csv('results/stats-r{ratio}.csv'.format(ratio=n_snps))
 
@@ -508,3 +485,4 @@ cli = click.CommandCollection(sources=[cli1, cli2,cli3])
 
 if __name__ == '__main__':
     cli()
+

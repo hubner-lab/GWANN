@@ -23,28 +23,57 @@ class DatasetPhenosim(Dataset):
 
         self.cache = dict()
 
+        self.eval_b = False 
+        self.reselect_randomly = False
+        self.full_dataset= False
         # self.missing_data = False 
 
     def __len__(self):
-
-
         s = glob.glob("{path}*0.emma_geno".format(path=self.root_path))
         return len(s) 
+
+    def eval_(self):
+        self.eval_b = True
+
+    def train(self):
+        self.eval_b = False
+
 
     def __getitem__(self,idx):
 
         # if torch.is_tensor(idx):
            # idx = idx.tolist()
         if idx in self.cache.keys():
-            return self.cache[idx] 
+
+            cache  = self.cache[idx] 
+            data_input = cache['input']
+            data_output = cache['output']
+            causal_SNP = cache['causal']
+            indexes = cache['indexes']
+
+            if not self.eval_b:
+                if self.reselect_randomly:
+                    n = self.SNP - len(causal_SNP)
+                    indexes = np.random.choice(np.setdiff1d(range(data_input.shape[0]),causal_SNP), n, replace=False)  
+                    indexes = np.concatenate((indexes,causal_SNP))
+                    np.random.shuffle(indexes)
+                return { 'input':torch.from_numpy(data_input[indexes,:]) ,'output': torch.from_numpy(data_output[indexes])}
+            elif self.full_dataset:
+                return { 'input':torch.from_numpy(data_input) , 'output': torch.from_numpy(data_output)}
+            else:
+                
+                indexes = np.random.choice(range(data_input.shape[0]), self.SNP, replace=False)  
+                np.random.shuffle(indexes)
+
+                return { 'input':torch.from_numpy(data_input[indexes,:]) , 'output': torch.from_numpy(data_output[indexes])}
+
         f = idx
 
         genotype_path  = "{base}{f}0.emma_geno".format(f=f,base=self.root_path)
         NrSNP_path = "{base}{f}0.causal".format(f=f,base=self.root_path)
         Ysim_path = "{base}{f}0.emma_pheno".format(f=f,base=self.root_path)
         
-        data_G = pd.read_csv(genotype_path,index_col=None,header=None,sep='\t').fillna(0)
-        # data_G = pd.read_csv(genotype_path,index_col=None,header=None,sep='\t').fillna(-1)
+        data_G = pd.read_csv(genotype_path,index_col=None,header=None,sep='\t').fillna(-1)
         data_SNP = pd.read_csv(NrSNP_path,index_col=None,header=None,sep='\t')
         data_Ysim = pd.read_csv(Ysim_path,index_col=None,header=None,sep='\t')
         
@@ -70,7 +99,7 @@ class DatasetPhenosim(Dataset):
 
         data_output = np.empty(data_input.shape[0])
         
-        data_output[:] = -1 
+        data_output[:] = -1
         data_output[causal_SNP] = 1 
         # data_output[causal_SNP] = 1 
 
@@ -84,17 +113,23 @@ class DatasetPhenosim(Dataset):
         indexes = np.concatenate((indexes,causal_SNP))
         np.random.shuffle(indexes)
 
-        data_input = data_input[indexes,:]
-        data_output = data_output[indexes]
+        # data_input = data_input[indexes,:]
+        # data_output = data_output[indexes]
 
         # output = torch.from_numpy(data_output).to(int)
         # output = output.unsqueeze(1)
         # output = torch.zeros(output.shape[0],2).scatter_(1, output, 1)
 
         
-        final_output = { 'input':torch.from_numpy(data_input) , 
-                         'output': torch.from_numpy(data_output)}
+        final_output = { 'input':torch.from_numpy(data_input[indexes,:]) , 
+                          'output': torch.from_numpy(data_output[indexes])}
 
-        self.cache[idx] = final_output
+        self.cache[idx] = {
+            'input': data_input,
+            'output':data_output,
+            'causal': causal_SNP,
+            'indexes': indexes,
+        }
+
 
         return final_output
