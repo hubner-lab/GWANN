@@ -11,6 +11,9 @@ import torchvision.transforms as T
 import numpy as np
 import pandas as pd
 
+import glob
+import re
+
 class DatasetPhenosim(Dataset):
     def __init__(self,samples,SNP,root_path):
 
@@ -20,11 +23,13 @@ class DatasetPhenosim(Dataset):
 
         self.cache = dict()
 
-        self.missing_data = False 
-        self.missing_data_per = 0.03
+        # self.missing_data = False 
 
     def __len__(self):
-        return 100 # TODO: change 
+
+
+        s = glob.glob("{path}*0.emma_geno".format(path=self.root_path))
+        return len(s) 
 
     def __getitem__(self,idx):
 
@@ -38,9 +43,10 @@ class DatasetPhenosim(Dataset):
         NrSNP_path = "{base}{f}0.causal".format(f=f,base=self.root_path)
         Ysim_path = "{base}{f}0.emma_pheno".format(f=f,base=self.root_path)
         
-        data_G = pd.read_csv(genotype_path,index_col=None,header=None)
-        data_SNP = pd.read_csv(NrSNP_path,index_col=None,header=None)
-        data_Ysim = pd.read_csv(Ysim_path,index_col=None,header=None)
+        data_G = pd.read_csv(genotype_path,index_col=None,header=None,sep='\t').fillna(0)
+        # data_G = pd.read_csv(genotype_path,index_col=None,header=None,sep='\t').fillna(-1)
+        data_SNP = pd.read_csv(NrSNP_path,index_col=None,header=None,sep='\t')
+        data_Ysim = pd.read_csv(Ysim_path,index_col=None,header=None,sep='\t')
         
         data_Ysim_sorted = data_Ysim.T.sort_values(by=[0])
         data_SNP = data_SNP.sort_values(by=[0])
@@ -54,7 +60,7 @@ class DatasetPhenosim(Dataset):
         if min_eff != max_eff:
             leftSpan = max_eff - min_eff 
             rightSpan = 1 
-            causal_SNP_eff = (causal_SNP_eff - min_eff) / leftSpan 
+            causal_SNP_eff = ((causal_SNP_eff - min_eff) / leftSpan)
         else:
             causal_SNP_eff = 1 
 
@@ -62,17 +68,11 @@ class DatasetPhenosim(Dataset):
         sorted_axes = data_Ysim_sorted.index.values
         data_input = data_G.T.reindex(sorted_axes).T.to_numpy()
 
-
-        if self.missing_data:
-            indices = np.where(data_input.ravel())[0]
-            to_replace = np.random.permutation(indices)[:int(indices.size * self.missing_data_per)]
-            data_input[np.unravel_index(to_replace, data_input.shape)] = -1
-
-
         data_output = np.empty(data_input.shape[0])
         
         data_output[:] = -1 
         data_output[causal_SNP] = 1 
+        # data_output[causal_SNP] = 1 
 
         # data_output[causal_SNP] = causal_SNP_eff 
         # population = pd.DataFrame(self.init_pop)
@@ -87,14 +87,14 @@ class DatasetPhenosim(Dataset):
         data_input = data_input[indexes,:]
         data_output = data_output[indexes]
 
+        # output = torch.from_numpy(data_output).to(int)
+        # output = output.unsqueeze(1)
+        # output = torch.zeros(output.shape[0],2).scatter_(1, output, 1)
 
         
         final_output = { 'input':torch.from_numpy(data_input) , 
-                         'output':torch.from_numpy(data_output) }
+                         'output': torch.from_numpy(data_output)}
 
         self.cache[idx] = final_output
 
         return final_output
-
-
-

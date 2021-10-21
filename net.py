@@ -24,45 +24,57 @@ class Net(nn.Module):
         
         inputs = torch.rand((1,1,self.width,self.samples//self.width))
         
-        self.c1 = 5
-        self.c2 = 4 
-        self.c3 = 3 
+        c1 = 3
+        c2 = 2 
+        c3 = 2 
+
+        p1 = 2
+        p2 = 2
         
-        self.conv1 = nn.Conv2d(1,3,(self.c1,self.c1))
-        self.conv2 = nn.Conv2d(3,5,(self.c2,self.c2))
-        self.conv3 = nn.Conv2d(5,10,(self.c3,self.c3))
+        self.conv1 = nn.Conv2d(1,3,(c1,c1))
+        # self.maxpool1 = nn.MaxPool2d(p1)
+        self.conv2 = nn.Conv2d(3,5,(c2,c2))
+        # self.maxpool2 = nn.MaxPool2d(p1)
+        self.conv3 = nn.Conv2d(5,10,(c3,c3))
         
-        self.final = size_of_output(inputs,[self.conv1,self.conv2,self.conv3]) 
+        self.final = size_of_output(inputs,[
+            self.conv1,
+            # self.maxpool1,
+            self.conv2,
+            # self.maxpool2,
+            self.conv3
+        ]) 
         
-        self.lin1 = nn.Linear(self.final,100)
-        self.lin2 = nn.Linear(100,10)
-        self.lin3 = nn.Linear(10,1)
+        self.lin1 = nn.Linear(self.final,10)
+        # self.lin2 = nn.Linear(100,10)
+        self.lin2 = nn.Linear(10,1)
 
     def forward(self,x):
         # x shape: (batch,SNP,samples) 
 
         x = x.view(self.batch,self.SNP,self.width,-1)
-        x = x.view(self.SNP*self.batch,self.width,-1)
+        x = x.view(self.batch*self.SNP,self.width,-1)
         x = torch.unsqueeze(x,1)
-        
+
 
         x = self.conv1(x)
-        # x = F.dropout(x,p = 0.2,training=self.training) 
+        # x = self.maxpool1(x)
         x = self.conv2(x)
-        # x = F.dropout(x,p = 0.2,training=self.training) 
+        # x = self.maxpool2(x)
         x = self.conv3(x)
 
         x = torch.flatten(x, 1)
 
-        # x = F.dropout(x,p = 0.2,training=self.training) 
-        x = self.lin1(x)
         # x = torch.sigmoid(x)
-        # x = F.dropout(x,p = 0.2,training=self.training) 
+        x = self.lin1(x)
+        x = F.dropout(x,p = 0.2,training=self.training) 
         x = self.lin2(x)
         # x = torch.sigmoid(x)
+        # x = torch.nn.functional.softmax(x,dim=1)
         # x = F.dropout(x,p = 0.2,training=self.training) 
-        x = self.lin3(x)
+        # x = self.lin3(x)
         
         x = x.view(self.batch,self.SNP)
 
         return x
+ 
