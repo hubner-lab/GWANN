@@ -268,8 +268,8 @@ def train(epochs,n_samples,n_snps,batch,ratio,width,path,deterministic,debug):
     net = Net(n_snps,n_samples,batch,width).to(device)
 
     if debug:
-        print(torch.version.cuda)
-        print(torch.backends.cudnn.version())
+        print("CUDA verison : {0}".format(torch.version.cuda))
+        print("CUDNN verison : {0}".format(torch.backends.cudnn.version()))
         print(net)
         print(device)
         print("SNPs: {0} , samples: {1}, batch: {2} , width : {3}".format(n_snps,n_samples,batch,width))
@@ -284,7 +284,7 @@ def train(epochs,n_samples,n_snps,batch,ratio,width,path,deterministic,debug):
 
     # m = nn.Sigmoid()
 
-    optimizer = optim.SGD(net.parameters(), lr=1e-1,momentum=0.9,weight_decay=1e-5)
+    optimizer = optim.SGD(net.parameters(), lr=1e-2,momentum=0.9,weight_decay=1e-5)
     scheduler = optim.lr_scheduler.ExponentialLR(optimizer,gamma=0.99)
 
     min_loss = np.Infinity
@@ -299,7 +299,7 @@ def train(epochs,n_samples,n_snps,batch,ratio,width,path,deterministic,debug):
     clip_grad_norm = 5 
     e = 0
 
-    plot_average = True 
+    plot_average = False 
 
     if plot_average:
         fig,ax = plt.subplots(2,2)
@@ -333,8 +333,8 @@ def train(epochs,n_samples,n_snps,batch,ratio,width,path,deterministic,debug):
     
 
         net.eval()
-        if debug:
-            full_dataset.eval_()
+        # if debug:
+            # full_dataset.eval_()
 
         with torch.no_grad():
             for i,data in enumerate(dataloader_test):
@@ -406,7 +406,7 @@ def train(epochs,n_samples,n_snps,batch,ratio,width,path,deterministic,debug):
             TN_arr[e] = n_TN
             FN_arr[e] = n_FN
 
-            print("FP: {0}, FN : {1}, TP: {2}, TN: {3}".format(n_FP,n_FN,n_TP,n_TN))
+            # print("FP: {0}, FN : {1}, TP: {2}, TN: {3}".format(n_FP,n_FN,n_TP,n_TN))
             accuracy = 100.0*(n_TP+n_TN)/(n_FP+n_FN+n_TN+n_TP)
             recall = 100.0*(n_TP/(n_TP+n_FN)) if n_TP + n_FN >0 else 0
             precision = 100.0*(n_TP/(n_TP+n_FP)) if n_TP + n_FP >0 else 0

@@ -18,8 +18,8 @@ class Net(nn.Module):
         super(Net,self).__init__()
             
         # self.SNP = num_SNP
+        # self.batch = batch 
         self.samples = num_Samples
-        self.batch = batch 
         self.width = width 
         
         inputs = torch.rand((1,1,self.width,self.samples//self.width))
@@ -52,10 +52,10 @@ class Net(nn.Module):
     def forward(self,x):
         # x shape: (batch,SNP,samples) 
 
-        SNP = x.shape[1]
+        BATCH,SNP,_ = x.shape
 
-        x = x.view(self.batch,SNP,self.width,-1)
-        x = x.view(self.batch*SNP,self.width,-1)
+        x = x.view(BATCH,SNP,self.width,-1)
+        x = x.view(BATCH*SNP,self.width,-1)
         x = torch.unsqueeze(x,1)
 
 
@@ -68,14 +68,16 @@ class Net(nn.Module):
         x = torch.flatten(x, 1)
 
         # x = torch.sigmoid(x)
+
         x = self.lin1(x)
         x = F.dropout(x,p = 0.2,training=self.training) 
         x = self.lin2(x)
+
         # x = torch.nn.functional.softmax(x,dim=1)
         # x = F.dropout(x,p = 0.2,training=self.training) 
         # x = self.lin3(x)
         
-        x = x.view(self.batch,SNP)
+        x = x.view(BATCH,SNP)
 
         return x
  
