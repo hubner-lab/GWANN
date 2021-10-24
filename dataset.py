@@ -24,8 +24,9 @@ class DatasetPhenosim(Dataset):
         self.cache = dict()
 
         self.eval_b = False 
+
         self.reselect_randomly = False
-        self.full_dataset= False
+        self.full_dataset = False 
         # self.missing_data = False 
 
     def __len__(self):
@@ -41,11 +42,9 @@ class DatasetPhenosim(Dataset):
 
     def __getitem__(self,idx):
 
-        # if torch.is_tensor(idx):
-           # idx = idx.tolist()
         if idx in self.cache.keys():
-
             cache  = self.cache[idx] 
+
             data_input = cache['input']
             data_output = cache['output']
             causal_SNP = cache['causal']
@@ -100,10 +99,14 @@ class DatasetPhenosim(Dataset):
         data_output = np.empty(data_input.shape[0])
         
         data_output[:] = -1
+        # data_output[:] = -1 
         data_output[causal_SNP] = 1 
-        # data_output[causal_SNP] = 1 
 
+
+        # data_output[:] = 0
+        # data_output[causal_SNP] = 1 
         # data_output[causal_SNP] = causal_SNP_eff 
+
         # population = pd.DataFrame(self.init_pop)
         # population = population.reindex(sorted_axes).to_numpy().flatten()
         

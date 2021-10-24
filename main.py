@@ -14,6 +14,8 @@ import torch.nn.utils.prune as prune
 import torchvision
 import torchvision.transforms as T
 
+# torch.backends.cudnn.benchmark = False
+
 import pandas as pd
 import numpy as np
 import matplotlib.pyplot as plt
@@ -29,6 +31,7 @@ import seaborn as sns
 import allel
 
 import sklearn
+
 import cv2
 
 from pathlib import Path
@@ -77,9 +80,8 @@ def run(vcf,pheno_path,n_samples,width,seed,model,output_path):
 
     device = torch.device("cuda:0" if torch.cuda.is_available() else "cpu")
 
-    # tmp_vcf = np.empty(vcf[:,:,0].shape)
     tmp_vcf = (vcf[:,:,0] + vcf[:,:,1]) / 2
-    # tmp_vcf[np.where(tmp_vcf == 0.5)] = 0 
+    tmp_vcf[np.where(tmp_vcf == 0.5)] = 0 
 
     final_vcf = torch.from_numpy(tmp_vcf).float().to(device)
 
@@ -116,8 +118,10 @@ def run(vcf,pheno_path,n_samples,width,seed,model,output_path):
             input = torch.unsqueeze(input,0)
 
             outputs = net(input)
+            # output[j*n_snps:j*n_snps + input_s[j].shape[0]] = outputs[:,-input_s[j].shape[0]:]
 
-            output[j*n_snps:j*n_snps + input_s[j].shape[0]] = outputs[:,-input_s[j].shape[0]:]
+
+            output[j*n_snps:j*n_snps + input_s[j].shape[0]] = outputs[:,1,-input_s[j].shape[0]:]
 
 
     output = output.cpu()
@@ -131,7 +135,7 @@ def run(vcf,pheno_path,n_samples,width,seed,model,output_path):
     chr_loc = []
 
 
-    min = 0
+    min = 0.5
     print(100 * (torch.count_nonzero(output > min)/output.shape[0]).item())
 
     color = ""
@@ -153,7 +157,6 @@ def run(vcf,pheno_path,n_samples,width,seed,model,output_path):
     plt.setp(ax.get_xticklabels(), rotation=70, horizontalalignment='right')
     fig.tight_layout()
     fig.savefig(output_path)
-
 
 
 
@@ -185,11 +188,11 @@ def simulate(pop,n_samples,n_sim,n_snps,maf,miss,equal):
     seed_arr = np.array(list(range(pop))) + np.random.randint(1,1000000)
     np.random.shuffle(seed_arr)
 
-    seed = 0
+    # seed = 0
 
-    torch.manual_seed(seed)
-    random.seed(seed)
-    np.random.seed(seed)
+    # torch.manual_seed(seed)
+    # random.seed(seed)
+    # np.random.seed(seed)
 
 
     cpus = multiprocessing.cpu_count()
@@ -202,11 +205,11 @@ def simulate(pop,n_samples,n_sim,n_snps,maf,miss,equal):
 
         variance = np.ones(n_snps)
         if equal:
-            variance = variance / (2*n_snps)
+            variance = (variance / n_snps) * 0.9
         else:
-            variance = np.random.dirichlet(variance,size=1)
+            variance = np.random.dirichlet(variance,size=1) * 0.9
 
-        var_str = np.array2string(variance,precision=5,separator=',')
+        var_str = np.array2string(variance,precision=5,separator=',',formatter={'float_kind':lambda x: "%.5f" % x})
         var_str = re.sub("\[|\s*|\]","",var_str)
         phenosim_command += " -n {snps} -v {var}".format(snps=n_snps,var=var_str)
 
@@ -237,6 +240,7 @@ def train(epochs,n_samples,n_snps,batch,ratio,width,path,deterministic,debug):
     
 
     device = torch.device("cuda:0" if torch.cuda.is_available() else "cpu")
+    # device = "cpu" 
 
     generator = torch.Generator()
 
@@ -248,6 +252,7 @@ def train(epochs,n_samples,n_snps,batch,ratio,width,path,deterministic,debug):
 
         torch.use_deterministic_algorithms(True)
         os.environ["CUBLAS_WORKSPACE_CONFIG"]=":16:8"
+
         # os.environ["CUBLAS_WORKSPACE_CONFIG"]=":4096:8"
         # if not torch.backends.cudnn.deterministic: 
             # exit(1)
@@ -275,8 +280,10 @@ def train(epochs,n_samples,n_snps,batch,ratio,width,path,deterministic,debug):
         print("SNPs: {0} , samples: {1}, batch: {2} , width : {3}".format(n_snps,n_samples,batch,width))
 
 
-    # criterion = nn.SoftMarginLoss()
-    # criterion = nn.BCEWithLogitsLoss()
+
+    # criterion = nn.CrossEntropyLoss()
+    # criterion_test = F.cross_entropy
+
     criterion = nn.MSELoss()
     criterion_test = F.mse_loss
 
@@ -284,7 +291,7 @@ def train(epochs,n_samples,n_snps,batch,ratio,width,path,deterministic,debug):
 
     # m = nn.Sigmoid()
 
-    optimizer = optim.SGD(net.parameters(), lr=1e-2,momentum=0.9,weight_decay=1e-5)
+    optimizer = optim.SGD(net.parameters(), lr=1e-1,momentum=0.9,weight_decay=1e-5)
     scheduler = optim.lr_scheduler.ExponentialLR(optimizer,gamma=0.99)
 
     min_loss = np.Infinity
@@ -342,6 +349,14 @@ def train(epochs,n_samples,n_snps,batch,ratio,width,path,deterministic,debug):
                 inputs = data['input'].float().to(device)
                 pred = data['output'].float().to(device)
 
+                # _pred_shape = pred.shape
+
+                # ind = torch.unsqueeze(pred,2).to(torch.int64)
+
+                # pred_onehot = torch.FloatTensor(*_pred_shape,2).to(device)
+                # pred_onehot.zero_()
+                # pred_onehot.scatter_(1, ind, 1)
+
                 outputs = net(inputs)
 
                 loss = criterion_test(outputs,pred)
@@ -357,18 +372,28 @@ def train(epochs,n_samples,n_snps,batch,ratio,width,path,deterministic,debug):
 
 
                     pred_copy = pred.detach().clone().flatten()
-                    outputs_copy = outputs.detach().clone().flatten()
+                    outputs_copy = outputs.detach().clone().flatten() 
 
-                    # outputs_copy = torch.sign(outputs_copy)
+                    # outputs_copy = torch.argmax(outputs.detach().clone(),1).flatten()
+
+
+            #         # outputs_copy = torch.sign(outputs_copy)
                     ind_tmp = (outputs_copy >= 0).nonzero()
                     ind_tmp_2 = (outputs_copy < 0).nonzero()
 
-                    if deterministic:
-                        outputs_copy[ind_tmp] = torch.ones(outputs_copy[ind_tmp].shape).to(device)  # cuda problem when CUBLAS_WORKSPACE_CONFIG=":16:8"
+                    pred_ind_tmp = (pred_copy >= 0).nonzero()
+                    pred_ind_tmp_2 = (pred_copy < 0).nonzero()
+
+                    if deterministic: # cuda problem when CUBLAS_WORKSPACE_CONFIG=":16:8"
+                        outputs_copy[ind_tmp] = torch.ones(outputs_copy[ind_tmp].shape).to(device)  
                         outputs_copy[ind_tmp_2] = - torch.ones(outputs_copy[ind_tmp_2].shape).to(device) 
+                        pred_copy[pred_ind_tmp] = torch.ones(pred_copy[pred_ind_tmp].shape).to(device)  
+                        pred_copy[pred_ind_tmp_2] = -torch.ones(pred_copy[pred_ind_tmp_2].shape).to(device) 
                     else:
                         outputs_copy[ind_tmp] = 1.
                         outputs_copy[ind_tmp_2] = -1.
+                        pred_copy[pred_ind_tmp] = 1
+                        pred_copy[pred_ind_tmp_2] = -1 
 
 
                     false_ind = torch.where(outputs_copy != pred_copy)
@@ -380,8 +405,10 @@ def train(epochs,n_samples,n_snps,batch,ratio,width,path,deterministic,debug):
                     true_ind = true_ind[0]
 
                     false_positives = false_ind[torch.where(false == 1)]  
+                    # false_negatives = false_ind[torch.where(false == 0)] 
                     false_negatives = false_ind[torch.where(false == -1)] 
                     true_positives = true_ind[torch.where(true == 1)]
+                    # true_negatives = true_ind[torch.where(true == 0)]
                     true_negatives = true_ind[torch.where(true == -1)]
 
                     if len(false_positives) != 0 :
@@ -465,7 +492,17 @@ def train(epochs,n_samples,n_snps,batch,ratio,width,path,deterministic,debug):
             inputs = data['input'].float().to(device)
             pred = data['output'].float().to(device)
 
+            # _pred_shape = pred.shape
+
+            # ind = torch.unsqueeze(pred,2).to(torch.int64)
+
+            # pred_onehot = torch.FloatTensor(*_pred_shape,2).to(device)
+            # pred_onehot.zero_()
+            # pred_onehot.scatter_(1, ind, 1)
+
             outputs = net(inputs)
+
+            
             loss = criterion(outputs, pred)
             loss.backward()
             torch.nn.utils.clip_grad_norm_(net.parameters(), clip_grad_norm)
