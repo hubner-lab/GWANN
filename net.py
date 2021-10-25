@@ -48,8 +48,8 @@ class Net(nn.Module):
         
         self.lin1 = nn.Linear(self.final,10)
         # self.lin2 = nn.Linear(100,10)
-        self.lin2 = nn.Linear(10,2)
-        # self.lin2 = nn.Linear(10,1)
+        # self.lin2 = nn.Linear(10,2)
+        self.lin2 = nn.Linear(10,1)
 
     def forward(self,x):
         # x shape: (batch,SNP,samples) 
