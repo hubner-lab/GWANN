@@ -5,6 +5,8 @@ import torch.nn.functional as F
 import functools
 import operator
 
+import math
+
 def shape_of_output(inputs, layers):
     sequential = nn.Sequential(*layers)
     return sequential(inputs).shape
@@ -17,14 +19,13 @@ class Net(nn.Module):
     def __init__(self,num_SNP,num_Samples,batch,width):
         super(Net,self).__init__()
             
-        # self.SNP = num_SNP
-        # self.batch = batch 
         self.samples = num_Samples
         self.width = width 
+        self.height = self.samples//self.width
         
-        inputs = torch.rand((1,1,self.width,self.samples//self.width))
-        
-        c1 = 3
+        inputs = torch.rand((1,1,self.width,self.height))
+
+        c1 = 2
         c2 = 2 
         c3 = 2 
 
@@ -36,8 +37,6 @@ class Net(nn.Module):
         self.conv2 = nn.Conv2d(3,5,(c2,c2))
         self.conv3 = nn.Conv2d(5,10,(c3,c3))
 
-        # nn.Sequential()
-        
         self.final = size_of_output(inputs,[
             self.conv1,
             self.maxpool,
@@ -45,7 +44,7 @@ class Net(nn.Module):
             self.maxpool,
             self.conv3
         ]) 
-        
+
         self.lin1 = nn.Linear(self.final,10)
         # self.lin2 = nn.Linear(100,10)
         # self.lin2 = nn.Linear(10,2)
@@ -54,13 +53,11 @@ class Net(nn.Module):
     def forward(self,x):
         # x shape: (batch,SNP,samples) 
 
-
-        BATCH,SNP,_ = x.shape
+        BATCH,SNP,SAMPLES = x.shape
 
         x = x.view(BATCH,SNP,self.width,-1)
         x = x.view(BATCH*SNP,self.width,-1)
         x = torch.unsqueeze(x,1)
-
 
         x = self.conv1(x)
         x = self.maxpool(x)
@@ -81,6 +78,8 @@ class Net(nn.Module):
 
         x = x.view(BATCH,SNP)
 
+        x_clone = x.detach().clone()
+        # x = torch.sigmoid(x)
 
         return x
  

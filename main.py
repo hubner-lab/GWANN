@@ -53,6 +53,7 @@ def cli1():
 @cli1.command()
 @click.option('-v', '--vcf','vcf',required=True)
 @click.option('-p', '--pheno','pheno_path',required=True)
+@click.option('-t', '--trait','trait',required=True)
 
 @click.option('-s', '--samples','n_samples',default=250,type=int)
 @click.option('-w', '--width','width',default=10,type=int)
@@ -60,7 +61,7 @@ def cli1():
 @click.option('--model','model',default="models/net.pt")
 @click.option('--output','output_path',default="results/GWAS.png")
 
-def run(vcf,pheno_path,n_samples,width,seed,model,output_path):
+def run(vcf,pheno_path,trait,n_samples,width,seed,model,output_path):
     """Run"""
 
     from net import Net
@@ -85,14 +86,16 @@ def run(vcf,pheno_path,n_samples,width,seed,model,output_path):
 
     final_vcf = torch.from_numpy(tmp_vcf).float().to(device)
 
-    n_snps = final_vcf.shape[0] // 4
+    n_snps = final_vcf.shape[0] 
 
     if not Path(pheno_path).is_file():
         print("Invalid file pheno")
         exit(1)
 
-    pheno = pd.read_csv(pheno_path,index_col=None,header=None,sep=' ')
-    pheno_sorted = pheno.sort_values(by=[2])
+    pheno = pd.read_csv(pheno_path,index_col=None,sep=',')
+    pheno_sorted = pheno.sort_values(by=trait,na_position='first')
+
+    print(pheno_sorted[trait])
 
     sorted_axes = np.array(pheno_sorted.index.values)
     sorted_vcf = final_vcf[:,sorted_axes]
@@ -121,9 +124,6 @@ def run(vcf,pheno_path,n_samples,width,seed,model,output_path):
             output[j*n_snps:j*n_snps + input_s[j].shape[0]] = outputs[:,-input_s[j].shape[0]:]
 
 
-            # output[j*n_snps:j*n_snps + input_s[j].shape[0]] = outputs[:,1,-input_s[j].shape[0]:]
-
-
     output = output.cpu()
 
     plt.clf()
@@ -135,11 +135,19 @@ def run(vcf,pheno_path,n_samples,width,seed,model,output_path):
     chr_loc = []
 
 
-    min = 0
+    min = 0 
     print(100 * (torch.count_nonzero(output > min)/output.shape[0]).item())
 
-    color = ""
+
+    index_tmp = (output > min).nonzero().flatten().numpy()
+    value_tmp = output.detach().clone()[index_tmp].flatten().numpy()
+
+    df = pd.DataFrame({"value":value_tmp},index=index_tmp)
+    df.to_csv('results/indexes.csv')
+
     output[np.where(output <= min)] = min
+
+    color = ""
 
     for chr in chrom_labels:
         if color == "blue":
@@ -291,9 +299,9 @@ def train(epochs,n_samples,n_snps,batch,ratio,width,path,deterministic,debug):
 
     # m = nn.Sigmoid()
 
-    optimizer = optim.SGD(net.parameters(),lr=0.5)
-    # optimizer = optim.SGD(net.parameters(), lr=1e-1,momentum=0.9,weight_decay=1e-5)
-    scheduler = optim.lr_scheduler.ExponentialLR(optimizer,gamma=0.99)
+    # optimizer = optim.SGD(net.parameters(),lr=.5)
+    optimizer = optim.SGD(net.parameters(), lr=1e-1,momentum=0.9,weight_decay=1e-5)
+    scheduler = optim.lr_scheduler.ExponentialLR(optimizer,gamma=0.7)
 
     min_loss = np.Infinity
     max_accuracy = 0
@@ -363,11 +371,11 @@ def train(epochs,n_samples,n_snps,batch,ratio,width,path,deterministic,debug):
                 times += 1
 
                 if debug:
-                    x = inputs.detach().clone() 
-                    tmp_n_snps = x.shape[1]
-                    x = x.view(batch,tmp_n_snps,width,-1)
-                    x = x.view(batch*tmp_n_snps,width,-1)
-                    x = torch.unsqueeze(x,1)
+                   #  x = inputs.detach().clone() 
+                    # tmp_n_snps = x.shape[1]
+                    # x = x.view(batch,tmp_n_snps,width,-1)
+                    # x = x.view(batch*tmp_n_snps,width,-1)
+                    # x = torch.unsqueeze(x,1)
 
 
                     pred_copy = pred.detach().clone().flatten()
@@ -375,24 +383,29 @@ def train(epochs,n_samples,n_snps,batch,ratio,width,path,deterministic,debug):
 
                     # outputs_copy = torch.argmax(outputs.detach().clone(),1).flatten()
 
+                    min = 0
 
             #         # outputs_copy = torch.sign(outputs_copy)
-                    ind_tmp = (outputs_copy >= 0).nonzero()
-                    ind_tmp_2 = (outputs_copy < 0).nonzero()
+                    ind_tmp = (outputs_copy >= min).nonzero()
+                    ind_tmp_2 = (outputs_copy < min).nonzero()
 
-                    pred_ind_tmp = (pred_copy >= 0).nonzero()
-                    pred_ind_tmp_2 = (pred_copy < 0).nonzero()
+                    pred_ind_tmp = (pred_copy >= min).nonzero()
+                    pred_ind_tmp_2 = (pred_copy < min).nonzero()
 
                     if deterministic: # cuda problem when CUBLAS_WORKSPACE_CONFIG=":16:8"
                         outputs_copy[ind_tmp] = torch.ones(outputs_copy[ind_tmp].shape).to(device)  
                         outputs_copy[ind_tmp_2] = - torch.ones(outputs_copy[ind_tmp_2].shape).to(device) 
+                        # outputs_copy[ind_tmp_2] = torch.zeros(outputs_copy[ind_tmp_2].shape).to(device) 
                         pred_copy[pred_ind_tmp] = torch.ones(pred_copy[pred_ind_tmp].shape).to(device)  
                         pred_copy[pred_ind_tmp_2] = -torch.ones(pred_copy[pred_ind_tmp_2].shape).to(device) 
+                        # pred_copy[pred_ind_tmp_2] = torch.zeros(pred_copy[pred_ind_tmp_2].shape).to(device) 
                     else:
                         outputs_copy[ind_tmp] = 1.
                         outputs_copy[ind_tmp_2] = -1.
+                        # outputs_copy[ind_tmp_2] = 0 
                         pred_copy[pred_ind_tmp] = 1
-                        pred_copy[pred_ind_tmp_2] = -1 
+                        pred_copy[pred_ind_tmp_2] = -1.
+                        # pred_copy[pred_ind_tmp_2] = 0
 
 
                     false_ind = torch.where(outputs_copy != pred_copy)
@@ -411,16 +424,16 @@ def train(epochs,n_samples,n_snps,batch,ratio,width,path,deterministic,debug):
                     true_negatives = true_ind[torch.where(true == -1)]
 
                     if len(false_positives) != 0 :
-                        avr_FP += torch.mean(x[false_positives,0,:,:],axis=0)
+                        # avr_FP += torch.mean(x[false_positives,0,:,:],axis=0)
                         n_FP += len(false_positives)
                     if len(false_negatives) != 0:
-                        avr_FN += torch.mean(x[false_negatives,0,:,:],axis=0)
+                        # avr_FN += torch.mean(x[false_negatives,0,:,:],axis=0)
                         n_FN += len(false_negatives)
                     if len(true_positives) != 0 :
-                        avr_TP += torch.mean(x[true_positives,0,:,:],axis=0)
+                        # avr_TP += torch.mean(x[true_positives,0,:,:],axis=0)
                         n_TP += len(true_positives)
                     if len(true_negatives) != 0 :
-                        avr_TN += torch.mean(x[true_negatives,0,:,:],axis=0)
+                        # avr_TN += torch.mean(x[true_negatives,0,:,:],axis=0)
                         n_TN += len(true_negatives)
 
         if debug:

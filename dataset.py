@@ -98,8 +98,9 @@ class DatasetPhenosim(Dataset):
 
         data_output = np.empty(data_input.shape[0])
         
-        data_output[:] = -1
-        # data_output[:] = -1 
+
+        # data_output[:] =-1
+        data_output[:] = -1 
         data_output[causal_SNP] = 1 
 
 
