@@ -11,6 +11,8 @@ import torchvision.transforms as T
 import numpy as np
 import pandas as pd
 
+from sklearn.manifold import MDS
+
 import glob
 import re
 
@@ -25,9 +27,8 @@ class DatasetPhenosim(Dataset):
 
         self.eval_b = False 
 
-        self.reselect_randomly = False
+        self.reselect_randomly = False 
         self.full_dataset = False 
-        # self.missing_data = False 
 
     def __len__(self):
         s = glob.glob("{path}*0.emma_geno".format(path=self.root_path))
@@ -49,6 +50,7 @@ class DatasetPhenosim(Dataset):
             data_output = cache['output']
             causal_SNP = cache['causal']
             indexes = cache['indexes']
+            population = cache['population']
 
             if not self.eval_b:
                 if self.reselect_randomly:
@@ -56,15 +58,15 @@ class DatasetPhenosim(Dataset):
                     indexes = np.random.choice(np.setdiff1d(range(data_input.shape[0]),causal_SNP), n, replace=False)  
                     indexes = np.concatenate((indexes,causal_SNP))
                     np.random.shuffle(indexes)
-                return { 'input':torch.from_numpy(data_input[indexes,:]) ,'output': torch.from_numpy(data_output[indexes])}
+                return { 'input':torch.from_numpy(data_input[indexes,:]) ,'output': torch.from_numpy(data_output[indexes]),'population': torch.from_numpy(population) }
             elif self.full_dataset:
-                return { 'input':torch.from_numpy(data_input) , 'output': torch.from_numpy(data_output)}
+                return { 'input':torch.from_numpy(data_input) , 'output': torch.from_numpy(data_output),'population': torch.from_numpy(population)  }
             else:
                 
                 indexes = np.random.choice(range(data_input.shape[0]), self.SNP, replace=False)  
                 np.random.shuffle(indexes)
 
-                return { 'input':torch.from_numpy(data_input[indexes,:]) , 'output': torch.from_numpy(data_output[indexes])}
+                return { 'input':torch.from_numpy(data_input[indexes,:]) , 'output': torch.from_numpy(data_output[indexes]), 'population': torch.from_numpy(population) }
 
         f = idx
 
@@ -99,40 +101,34 @@ class DatasetPhenosim(Dataset):
         data_output = np.empty(data_input.shape[0])
         
 
-        # data_output[:] =-1
         data_output[:] = -1 
         data_output[causal_SNP] = 1 
 
-
-        # data_output[:] = 0
-        # data_output[causal_SNP] = 1 
-        # data_output[causal_SNP] = causal_SNP_eff 
-
         # population = pd.DataFrame(self.init_pop)
         # population = population.reindex(sorted_axes).to_numpy().flatten()
+
+        embedding = MDS(n_components=1)
+        mds_data = embedding.fit_transform(data_input.T).T
         
         n = self.SNP - len(causal_SNP)
         
         indexes = np.random.choice(np.setdiff1d(range(data_input.shape[0]),causal_SNP), n, replace=False)  
         indexes = np.concatenate((indexes,causal_SNP))
         np.random.shuffle(indexes)
-
-        # data_input = data_input[indexes,:]
-        # data_output = data_output[indexes]
-
-        # output = torch.from_numpy(data_output).to(int)
-        # output = output.unsqueeze(1)
-        # output = torch.zeros(output.shape[0],2).scatter_(1, output, 1)
+        
+        final_output =  { 
+                         'input':torch.from_numpy(data_input[indexes,:]), 
+                         'output': torch.from_numpy(data_output[indexes]),
+                         'population': torch.from_numpy(mds_data)
+                        }
 
         
-        final_output = { 'input':torch.from_numpy(data_input[indexes,:]) , 
-                          'output': torch.from_numpy(data_output[indexes])}
-
         self.cache[idx] = {
             'input': data_input,
             'output':data_output,
             'causal': causal_SNP,
             'indexes': indexes,
+            'population': mds_data,
         }
 
 

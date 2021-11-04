@@ -1,6 +1,7 @@
-import click
-import sys
 
+import click # command line 
+
+import sys
 import io
 import os
 
@@ -25,14 +26,9 @@ import time
 import functools
 import operator
 from functools import partial
-import scipy.stats as stats
-import seaborn as sns
+from sklearn.manifold import MDS
 
 import allel
-
-import sklearn
-
-import cv2
 
 from pathlib import Path
 import re
@@ -42,6 +38,23 @@ import shlex
 import multiprocessing
 
 import csv 
+import json
+
+JSON_FILE = Path("data.json")
+current_dict = None 
+
+def json_update(key,param):
+    tmp_dict = json.loads(JSON_FILE.read_text())
+    tmp_dict[key] = param 
+    current_dict = tmp_dict
+    JSON_FILE.write_text(json.dumps(tmp_dict))
+
+def json_get(key):
+    if current_dict is None:
+        tmp_dict = json.loads(JSON_FILE.read_text())
+        return tmp_dict[key] 
+    return current_dict[key]
+
 
 def num_sort(test_string):
     return list(map(int, re.findall(r'\d+', test_string)))[0]
@@ -51,20 +64,23 @@ def cli1():
     pass
 
 @cli1.command()
-@click.option('-v', '--vcf','vcf',required=True)
-@click.option('-p', '--pheno','pheno_path',required=True)
-@click.option('-t', '--trait','trait',required=True)
+@click.option('-v', '--vcf','vcf',required=True,help='path to the VCF file')
+@click.option('-p', '--pheno','pheno_path',required=True,help='path to the phenotype file (column seperated csv file)')
+@click.option('-t', '--trait','trait',required=True,help='name of the trait you want to test (header in the phenotype file)')
 
-@click.option('-s', '--samples','n_samples',default=250,type=int)
-@click.option('-w', '--width','width',default=10,type=int)
-@click.option('--seed','seed',default=random.randrange(sys.maxsize),type=int)
 @click.option('--model','model',default="models/net.pt")
-@click.option('--output','output_path',default="results/GWAS.png")
+@click.option('--output','output_path',default="results/GWAS")
 
-def run(vcf,pheno_path,trait,n_samples,width,seed,model,output_path):
-    """Run"""
+# @click.option('-s', '--samples','n_samples',default=250,type=int)
+# @click.option('-w', '--width','width',default=10,type=int)
+
+def run(vcf,pheno_path,trait,model,output_path):
+    """Run on real data"""
 
     from net import Net
+
+    width = json_get('width')
+    n_samples = json_get('samples')
 
     if not Path("vcf_data").is_dir():
         Path.mkdir("vcf_data")
@@ -86,6 +102,14 @@ def run(vcf,pheno_path,trait,n_samples,width,seed,model,output_path):
 
     final_vcf = torch.from_numpy(tmp_vcf).float().to(device)
 
+    embedding = MDS(n_components=1)
+    mds_data = embedding.fit_transform(tmp_vcf.T)
+
+    pop = torch.from_numpy(mds_data).float().to(device)
+    pad_pop = torch.zeros((n_samples - pop.shape[0],1)).float().to(device) 
+
+    pop_padded =  torch.cat((pad_pop,pop),0)
+
     n_snps = final_vcf.shape[0] 
 
     if not Path(pheno_path).is_file():
@@ -95,7 +119,7 @@ def run(vcf,pheno_path,trait,n_samples,width,seed,model,output_path):
     pheno = pd.read_csv(pheno_path,index_col=None,sep=',')
     pheno_sorted = pheno.sort_values(by=trait,na_position='first')
 
-    print(pheno_sorted[trait])
+    # print(pheno_sorted[trait])
 
     sorted_axes = np.array(pheno_sorted.index.values)
     sorted_vcf = final_vcf[:,sorted_axes]
@@ -120,7 +144,7 @@ def run(vcf,pheno_path,trait,n_samples,width,seed,model,output_path):
             input = torch.cat((pad_2,input_tmp),1)
             input = torch.unsqueeze(input,0)
 
-            outputs = net(input)
+            outputs = net(input,pop_padded)
             output[j*n_snps:j*n_snps + input_s[j].shape[0]] = outputs[:,-input_s[j].shape[0]:]
 
 
@@ -138,12 +162,11 @@ def run(vcf,pheno_path,trait,n_samples,width,seed,model,output_path):
     min = 0 
     print(100 * (torch.count_nonzero(output > min)/output.shape[0]).item())
 
-
     index_tmp = (output > min).nonzero().flatten().numpy()
     value_tmp = output.detach().clone()[index_tmp].flatten().numpy()
 
     df = pd.DataFrame({"value":value_tmp},index=index_tmp)
-    df.to_csv('results/indexes.csv')
+    df.to_csv('{0}.csv'.format(output_path))
 
     output[np.where(output <= min)] = min
 
@@ -164,7 +187,7 @@ def run(vcf,pheno_path,trait,n_samples,width,seed,model,output_path):
     ax.set_xticklabels(chrom_labels)
     plt.setp(ax.get_xticklabels(), rotation=70, horizontalalignment='right')
     fig.tight_layout()
-    fig.savefig(output_path)
+    fig.savefig('{0}.png'.format(output_path))
 
 
 
@@ -183,6 +206,7 @@ def cli2():
 
 @cli2.command()
 @click.option('-p', '--population-size','pop',required=True,type=int)
+@click.option('-P', '--number-of-subpopulations','subpop',required=True,type=int)
 @click.option('-s', '--samples','n_samples',required=True,type=int)
 @click.option('-n', '--n_simulation','n_sim',required=True,type=int)
 @click.option('-S', '--causal_snps','n_snps',default=1,type=int)
@@ -190,32 +214,37 @@ def cli2():
 @click.option('--miss','miss',default=0.03,type=float)
 @click.option('--equal_variance/;','equal',default=False)
 
-def simulate(pop,n_samples,n_sim,n_snps,maf,miss,equal):
-    """Simulate"""
+def simulate(pop,subpop,n_samples,n_sim,n_snps,maf,miss,equal):
+    """Simulate training data"""
+
+    # assert width < n_samples ,"image width is bigger than the number of samples"
+    # assert n_samples % width == 0,"image width does not divide the number of samples"
+
+    json_update('samples',n_samples)
+           
 
     seed_arr = np.array(list(range(pop))) + np.random.randint(1,1000000)
     np.random.shuffle(seed_arr)
 
-    # seed = 0
-
-    # torch.manual_seed(seed)
-    # random.seed(seed)
-    # np.random.seed(seed)
-
-
     cpus = multiprocessing.cpu_count()
     pool = multiprocessing.Pool(cpus)
 
-    genome_command = shlex.split("genome -s {pop} -pop 1 {samples} -seed".format(pop=pop,samples=n_samples))
+
+
+    tmp = (n_samples // subpop)
+    tmp2 = n_samples - tmp * subpop 
+    samples_str = " ".join([str(tmp)] * (subpop-1) + [str(tmp + tmp2)])
+
+    genome_command = shlex.split("genome -s {pop} -pop {n_pop} {samples} -seed".format(pop=pop,n_pop=subpop,samples=samples_str))
     phenosim_command = "python2 simulation/phenosim/phenosim.py -i G -f simulation/data/genome{{0}}.txt --outfile simulation/data/{{0}} --maf_r {maf},1.0 --maf_c {maf} --miss {miss}".format(maf=maf,miss=miss)
 
     if n_snps > 1:
 
         variance = np.ones(n_snps)
         if equal:
-            variance = (variance / n_snps) * 0.9
+            variance = (variance / n_snps) * 0.99
         else:
-            variance = np.random.dirichlet(variance,size=1) * 0.9
+            variance = np.random.dirichlet(variance,size=1) * 0.99
 
         var_str = np.array2string(variance,precision=5,separator=',',formatter={'float_kind':lambda x: "%.5f" % x})
         var_str = re.sub("\[|\s*|\]","",var_str)
@@ -231,24 +260,26 @@ def cli3():
 
 @cli3.command()
 @click.option('-e', '--epochs','epochs',default=100,type=int)
-@click.option('-s', '--samples','n_samples',required=True,type=int)
+# @click.option('-s', '--samples','n_samples',required=True,type=int)
 @click.option('-S', '--SNPs','n_snps',required=True,type=int)
 @click.option('-b', '--batch','batch',default=20,type=int)
 @click.option('-r', '--ratio','ratio',default=0.8,type=float)
 @click.option('-w', '--width','width',default=15,type=int)
+
 @click.option('--path','path',required=True,type=str)
 @click.option('--verbose/;','debug',default=False)
 @click.option('--deterministic/;','deterministic',default=False)
 
-def train(epochs,n_samples,n_snps,batch,ratio,width,path,deterministic,debug):
-    """Train"""
+def train(epochs,n_snps,batch,ratio,width,path,deterministic,debug):
+    """Train the model on the simulated data"""
 
     from net import Net
     from dataset  import DatasetPhenosim,DatasetPhenosim
     
+    json_update('width',width)
+    n_samples = json_get('samples')
 
     device = torch.device("cuda:0" if torch.cuda.is_available() else "cpu")
-    # device = "cpu" 
 
     generator = torch.Generator()
 
@@ -260,11 +291,6 @@ def train(epochs,n_samples,n_snps,batch,ratio,width,path,deterministic,debug):
 
         torch.use_deterministic_algorithms(True)
         os.environ["CUBLAS_WORKSPACE_CONFIG"]=":16:8"
-
-        # os.environ["CUBLAS_WORKSPACE_CONFIG"]=":4096:8"
-        # if not torch.backends.cudnn.deterministic: 
-            # exit(1)
-
 
     full_dataset = DatasetPhenosim(n_samples,n_snps,path)
 
@@ -289,19 +315,11 @@ def train(epochs,n_samples,n_snps,batch,ratio,width,path,deterministic,debug):
 
 
 
-    # criterion = nn.CrossEntropyLoss()
-    # criterion_test = F.cross_entropy
-
     criterion = nn.MSELoss()
     criterion_test = F.mse_loss
 
-    # criterion = nn.HingeEmbeddingLoss()
-
-    # m = nn.Sigmoid()
-
-    # optimizer = optim.SGD(net.parameters(),lr=.5)
-    optimizer = optim.SGD(net.parameters(), lr=1e-1,momentum=0.9,weight_decay=1e-5)
-    scheduler = optim.lr_scheduler.ExponentialLR(optimizer,gamma=0.7)
+    optimizer = optim.SGD(net.parameters(), lr=1e-2,momentum=0.9,weight_decay=1e-5)
+    scheduler = optim.lr_scheduler.ExponentialLR(optimizer,gamma=0.99)
 
     min_loss = np.Infinity
     max_accuracy = 0
@@ -309,7 +327,6 @@ def train(epochs,n_samples,n_snps,batch,ratio,width,path,deterministic,debug):
     if not Path("models").is_dir():
         Path.mkdir("models")
 
-    # clip_grad_norm = np.inf 
     clip_grad_norm = 5 
     e = 0
 
@@ -355,37 +372,37 @@ def train(epochs,n_samples,n_snps,batch,ratio,width,path,deterministic,debug):
 
                 inputs = data['input'].float().to(device)
                 pred = data['output'].float().to(device)
+                pop = data['population'].float().to(device)
 
-                # _pred_shape = pred.shape
-
-                # ind = torch.unsqueeze(pred,2).to(torch.int64)
-
-                # pred_onehot = torch.FloatTensor(*_pred_shape,2).to(device)
-                # pred_onehot.zero_()
-                # pred_onehot.scatter_(1, ind, 1)
-
-                outputs = net(inputs)
+                outputs = net(inputs,pop)
 
                 loss = criterion_test(outputs,pred)
                 total_loss += loss.item()
                 times += 1
 
                 if debug:
-                   #  x = inputs.detach().clone() 
-                    # tmp_n_snps = x.shape[1]
-                    # x = x.view(batch,tmp_n_snps,width,-1)
-                    # x = x.view(batch*tmp_n_snps,width,-1)
-                    # x = torch.unsqueeze(x,1)
+                    x = inputs.detach().clone() 
+                    tmp_n_snps = x.shape[1]
+                    x = x.view(batch,tmp_n_snps,width,-1)
+                    x = x.view(batch*tmp_n_snps,width,-1)
+                    x = torch.unsqueeze(x,1)
 
+                    pop_copy = pop.detach().clone() 
+                    pop_copy = pop_copy.view(batch,n_samples)
+                    pop_copy = pop_copy.view(batch,width,-1)
+                    pop_copy = torch.unsqueeze(pop_copy,1)
+
+                    # plt.matshow(pop_copy[0,0,:,:].cpu())
+                    # plt.savefig("results/test.png")
+                    # print(torch.sigmoid(pop_copy[0,0,:,:]))
+                    # exit(0)
 
                     pred_copy = pred.detach().clone().flatten()
                     outputs_copy = outputs.detach().clone().flatten() 
 
-                    # outputs_copy = torch.argmax(outputs.detach().clone(),1).flatten()
 
                     min = 0
 
-            #         # outputs_copy = torch.sign(outputs_copy)
                     ind_tmp = (outputs_copy >= min).nonzero()
                     ind_tmp_2 = (outputs_copy < min).nonzero()
 
@@ -395,17 +412,13 @@ def train(epochs,n_samples,n_snps,batch,ratio,width,path,deterministic,debug):
                     if deterministic: # cuda problem when CUBLAS_WORKSPACE_CONFIG=":16:8"
                         outputs_copy[ind_tmp] = torch.ones(outputs_copy[ind_tmp].shape).to(device)  
                         outputs_copy[ind_tmp_2] = - torch.ones(outputs_copy[ind_tmp_2].shape).to(device) 
-                        # outputs_copy[ind_tmp_2] = torch.zeros(outputs_copy[ind_tmp_2].shape).to(device) 
                         pred_copy[pred_ind_tmp] = torch.ones(pred_copy[pred_ind_tmp].shape).to(device)  
                         pred_copy[pred_ind_tmp_2] = -torch.ones(pred_copy[pred_ind_tmp_2].shape).to(device) 
-                        # pred_copy[pred_ind_tmp_2] = torch.zeros(pred_copy[pred_ind_tmp_2].shape).to(device) 
                     else:
                         outputs_copy[ind_tmp] = 1.
                         outputs_copy[ind_tmp_2] = -1.
-                        # outputs_copy[ind_tmp_2] = 0 
                         pred_copy[pred_ind_tmp] = 1
                         pred_copy[pred_ind_tmp_2] = -1.
-                        # pred_copy[pred_ind_tmp_2] = 0
 
 
                     false_ind = torch.where(outputs_copy != pred_copy)
@@ -417,23 +430,21 @@ def train(epochs,n_samples,n_snps,batch,ratio,width,path,deterministic,debug):
                     true_ind = true_ind[0]
 
                     false_positives = false_ind[torch.where(false == 1)]  
-                    # false_negatives = false_ind[torch.where(false == 0)] 
                     false_negatives = false_ind[torch.where(false == -1)] 
                     true_positives = true_ind[torch.where(true == 1)]
-                    # true_negatives = true_ind[torch.where(true == 0)]
                     true_negatives = true_ind[torch.where(true == -1)]
 
                     if len(false_positives) != 0 :
-                        # avr_FP += torch.mean(x[false_positives,0,:,:],axis=0)
+                        avr_FP += torch.mean(x[false_positives,0,:,:],axis=0)
                         n_FP += len(false_positives)
                     if len(false_negatives) != 0:
-                        # avr_FN += torch.mean(x[false_negatives,0,:,:],axis=0)
+                        avr_FN += torch.mean(x[false_negatives,0,:,:],axis=0)
                         n_FN += len(false_negatives)
                     if len(true_positives) != 0 :
-                        # avr_TP += torch.mean(x[true_positives,0,:,:],axis=0)
+                        avr_TP += torch.mean(x[true_positives,0,:,:],axis=0)
                         n_TP += len(true_positives)
                     if len(true_negatives) != 0 :
-                        # avr_TN += torch.mean(x[true_negatives,0,:,:],axis=0)
+                        avr_TN += torch.mean(x[true_negatives,0,:,:],axis=0)
                         n_TN += len(true_negatives)
 
         if debug:
@@ -461,7 +472,7 @@ def train(epochs,n_samples,n_snps,batch,ratio,width,path,deterministic,debug):
 
 
             if max_accuracy < accuracy:
-                accuracy =max_accuracy
+                accuracy = max_accuracy
                 torch.save({
                     'model_state_dict': net.state_dict(),
                     'optimizer_state_dict': optimizer.state_dict(),
@@ -503,17 +514,9 @@ def train(epochs,n_samples,n_snps,batch,ratio,width,path,deterministic,debug):
 
             inputs = data['input'].float().to(device)
             pred = data['output'].float().to(device)
+            pop = data['population'].float().to(device)
 
-            # _pred_shape = pred.shape
-
-            # ind = torch.unsqueeze(pred,2).to(torch.int64)
-
-            # pred_onehot = torch.FloatTensor(*_pred_shape,2).to(device)
-            # pred_onehot.zero_()
-            # pred_onehot.scatter_(1, ind, 1)
-
-            outputs = net(inputs)
-
+            outputs = net(inputs,pop)
             
             loss = criterion(outputs, pred)
             loss.backward()

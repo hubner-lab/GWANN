@@ -8,14 +8,20 @@
 
 ## Dependencies
 * GENOME ([download](https://csg.sph.umich.edu/liang/genome/download.html))
+* python2 (for pheosim) 
+* python3 
 
-## How To Use
+## How To Start 
 
-To clone and run this application, you'll need [Git](https://git-scm.com) and . From your command line:
+To clone and run this application, you'll need [Git](https://git-scm.com) and python pip. From your command line:
 
 ```bash
 # Clone this repository
 $ git clone --recurse-submodules https://github.com/NimrodAshkenazy/GWANN
+
+# Create Virtual Environment (Optional)
+$ virtualenv myenv
+$ source myenv/bin/activate
 
 # Go into the repository
 $ cd GWANN 
@@ -24,3 +30,4 @@ $ cd GWANN
 $ pip install -r requirements.txt 
 ```
 
+## Usage
