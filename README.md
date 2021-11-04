@@ -17,7 +17,7 @@ To clone and run this application, you'll need [Git](https://git-scm.com) and py
 
 ```bash
 # Clone this repository
-$ git clone --recurse-submodules https://github.com/NimrodAshkenazy/GWANN
+$ git clone --recurse-submodules https://github.com/hubner-lab/GWANN
 
 # Create Virtual Environment (Optional)
 $ virtualenv myenv
