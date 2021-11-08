@@ -38,24 +38,27 @@ class Net(nn.Module):
             nn.Conv2d(5,10,(c3,c3))
         )
 
+        self.final = torch.numel(self.sequential(inputs))
 
-        self.sequential_pop = nn.Sequential(
-            nn.Conv2d(1,3,(c1,c1)),
-            nn.MaxPool2d(p),
-            nn.Conv2d(3,5,(c2,c2)),
-            nn.MaxPool2d(p),
-            nn.Conv2d(5,10,(c3,c3))
+        self.lin_seq = nn.Sequential(
+            nn.Linear(self.final ,10),
+            nn.Dropout(p=0.2),
+            # nn.ReLU(),
+            nn.Linear(10,1),
+            # nn.ReLU()
         )
 
 
-        self.final = torch.numel(self.sequential(inputs))
-
-        self.lin1 = nn.Linear(2*self.final,10)
-        self.lin2 = nn.Linear(10,1)
+        self.pop_seq = nn.Sequential(
+                nn.Linear(self.samples,self.samples // 2),
+                nn.Dropout(p=0.2),
+                # nn.ReLU(),
+                nn.Linear(self.samples // 2,self.final),
+                nn.Sigmoid(),
+        )
 
     def forward(self,x,pop):
         # x shape: (batch,SNP,samples) 
-
 
         BATCH,SNP,SAMPLES = x.shape
 
@@ -64,33 +67,15 @@ class Net(nn.Module):
         x = torch.unsqueeze(x,1)
 
         x = self.sequential(x)
-
         x = torch.flatten(x, 1)
 
-
         pop = pop.view(BATCH,SAMPLES)
-        pop = pop.view(BATCH,self.width,-1)
-        pop = torch.unsqueeze(pop,1)
-
-        pop = self.sequential_pop(pop)
-        pop = torch.flatten(pop, 1)
-
+        pop = self.pop_seq(pop)
         pop = pop.repeat(SNP,1)
 
+        output = x * pop 
 
-        output = torch.cat((x, pop), 1) 
-
-        output = self.lin1(output)
-        output = F.dropout(output,p = 0.2,training=self.training) 
-        output = self.lin2(output)
-
-        # x = torch.nn.functional.softmax(x,dim=1)
-        # x = x.view(BATCH,2,SNP)
-
+        output = self.lin_seq(output)
         output = output.view(BATCH,SNP)
 
-        # x_clone = x.detach().clone()
-        # x = torch.sigmoid(x)
-
         return output
- 

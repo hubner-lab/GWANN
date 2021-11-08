@@ -101,13 +101,13 @@ class DatasetPhenosim(Dataset):
         data_output = np.empty(data_input.shape[0])
         
 
-        data_output[:] = -1 
+        data_output[:] = -1
         data_output[causal_SNP] = 1 
 
         # population = pd.DataFrame(self.init_pop)
         # population = population.reindex(sorted_axes).to_numpy().flatten()
 
-        embedding = MDS(n_components=1)
+        embedding = MDS(n_components=1,random_state=0)
         mds_data = embedding.fit_transform(data_input.T).T
         
         n = self.SNP - len(causal_SNP)
