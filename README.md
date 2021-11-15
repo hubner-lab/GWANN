@@ -33,4 +33,5 @@ $ pip install -r requirements.txt
 ## Usage
 
 ## Results 
-![GWAS](./results/GWAS.png)
+![GWAS](images/GWAS.png)
+![net](images/net.jpg "net")

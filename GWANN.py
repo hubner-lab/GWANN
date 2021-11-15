@@ -1,4 +1,3 @@
-
 import click # command line 
 
 import sys
@@ -28,6 +27,8 @@ import operator
 from functools import partial
 from sklearn.manifold import MDS
 
+# import sgkit as sg
+# from sgkit.io.vcf import partition_into_regions, vcf_to_zarr
 import allel
 
 from pathlib import Path
@@ -39,6 +40,8 @@ import multiprocessing
 
 import csv 
 import json
+
+import resource
 
 JSON_FILE = Path("data.json")
 current_dict = None 
@@ -88,8 +91,7 @@ def run(vcf,pheno_path,trait,model,output_path):
     npz_loc = "vcf_data/{0}.npz".format(Path(vcf).stem)
 
     if not Path(npz_loc).is_file():
-        allel.vcf_to_npz(vcf, npz_loc, fields='*', overwrite=True)
-
+        allel.vcf_to_npz(vcf, npz_loc, fields='*', overwrite=True,chunk_length=8192,buffer_size=8192)
 
     callset = np.load(npz_loc,allow_pickle=True)
     vcf = callset['calldata/GT']
@@ -99,6 +101,8 @@ def run(vcf,pheno_path,trait,model,output_path):
 
     tmp_vcf = (vcf[:,:,0] + vcf[:,:,1]) / 2
     tmp_vcf[np.where(tmp_vcf == 0.5)] = 0 
+
+    print(tmp_vcf.shape)
 
     final_vcf = torch.from_numpy(tmp_vcf).float().to(device)
 
@@ -163,6 +167,10 @@ def run(vcf,pheno_path,trait,model,output_path):
 
 
     min = 0
+    
+    # avr = torch.mean(output)
+    # output -= avr
+
     print(100 * (torch.count_nonzero(output > min)/output.shape[0]).item())
 
     index_tmp = (output > min).nonzero().flatten().numpy()
@@ -538,6 +546,23 @@ def train(epochs,n_snps,batch,ratio,width,path,deterministic,debug):
 
 cli = click.CommandCollection(sources=[cli1, cli2,cli3])
 
+def memory_limit():
+    soft, hard = resource.getrlimit(resource.RLIMIT_AS)
+    resource.setrlimit(resource.RLIMIT_AS, (get_memory() * 1024 // 2, hard))
+
+def get_memory():
+    with open('/proc/meminfo', 'r') as mem:
+        free_memory = 0
+        for i in mem:
+            sline = i.split()
+            if str(sline[0]) in ('MemFree:', 'Buffers:', 'Cached:'):
+                free_memory += int(sline[1])
+    return free_memory
+
 if __name__ == '__main__':
-    cli()
+    # memory_limit()
+    try:
+        cli()
+    except MemoryError:
+        exit(1)
 
