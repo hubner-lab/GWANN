@@ -10,7 +10,7 @@ To facilitate the use of the CNN, the genotype 	information was converted into a
 ## Dependencies
 * GENOME ([download](https://csg.sph.umich.edu/liang/genome/download.html))
 * python2 (for pheosim) 
-* python3 
+* python>=3.8
 
 ## How To Start 
 
@@ -21,7 +21,7 @@ To clone and run this application, you'll need [Git](https://git-scm.com) and py
 $ git clone --recurse-submodules https://github.com/hubner-lab/GWANN.git
 
 # Create Virtual Environment (Optional)
-$ virtualenv myenv
+$ virtualenv -p python3.8 myenv
 $ source myenv/bin/activate
 
 # Go into the repository
