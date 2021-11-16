@@ -68,11 +68,11 @@ def cli1():
 
 @cli1.command()
 @click.option('-v', '--vcf','vcf',required=True,help='path to the VCF file')
-@click.option('-p', '--pheno','pheno_path',required=True,help='path to the phenotype file (column seperated csv file)')
-@click.option('-t', '--trait','trait',required=True,help='name of the trait you want to test (header in the phenotype file)')
+@click.option('-p', '--pheno','pheno_path',required=True,help='path to the phenotype file (comma seperated csv file)')
+@click.option('-t', '--trait','trait',required=True,help='name of the trait (header in the phenotype file)')
 
-@click.option('--model','model',default="models/net.pt")
-@click.option('--output','output_path',default="results/GWAS")
+@click.option('--model','model',default="models/net.pt",help="path to the network model generated in the training step")
+@click.option('--output','output_path',default="results/GWAS",help="prefix of output plot and causative SNPs indexes in the VCF")
 
 # @click.option('-s', '--samples','n_samples',default=250,type=int)
 # @click.option('-w', '--width','width',default=10,type=int)
@@ -216,14 +216,14 @@ def cli2():
     pass
 
 @cli2.command()
-@click.option('-p', '--population-size','pop',required=True,type=int)
-@click.option('-P', '--number-of-subpopulations','subpop',required=True,type=int)
-@click.option('-s', '--samples','n_samples',required=True,type=int)
-@click.option('-n', '--n_simulation','n_sim',required=True,type=int)
-@click.option('-S', '--causal_snps','n_snps',default=1,type=int)
-@click.option('-m', '--maf','maf',default=0.05,type=float)
-@click.option('--miss','miss',default=0.03,type=float)
-@click.option('--equal_variance/;','equal',default=False)
+@click.option('-p', '--number-of-snps','pop',required=True,type=int,help="number of SNPs in each simulation")
+@click.option('-P', '--number-of-subpopulations','subpop',required=True,type=int,help="number of expected subpopulations")
+@click.option('-s', '--samples','n_samples',required=True,type=int,help="number of individuals")
+@click.option('-n', '--number-of-simulation','n_sim',required=True,type=int,help="number of populations to be simulated")
+@click.option('-S', '--causal_snps','n_snps',default=1,type=int,help="number of causal SNPs expected per number of SNPs")
+@click.option('-m', '--maf','maf',default=0.05,type=float,help="minor allele frequency")
+@click.option('--miss','miss',default=0.03,type=float,help="proportion of missing data")
+@click.option('--equal_variance/;','equal',default=False,help="set this if equal variance is expected among SNPs (ignore for single SNP)")
 
 def simulate(pop,subpop,n_samples,n_sim,n_snps,maf,miss,equal):
     """Simulate training data"""
@@ -270,16 +270,15 @@ def cli3():
     pass
 
 @cli3.command()
-@click.option('-e', '--epochs','epochs',default=100,type=int)
-# @click.option('-s', '--samples','n_samples',required=True,type=int)
-@click.option('-S', '--SNPs','n_snps',required=True,type=int)
-@click.option('-b', '--batch','batch',default=20,type=int)
-@click.option('-r', '--ratio','ratio',default=0.8,type=float)
-@click.option('-w', '--width','width',default=15,type=int)
-
-@click.option('--path','path',required=True,type=str)
-@click.option('--verbose/;','debug',default=False)
-@click.option('--deterministic/;','deterministic',default=False)
+@click.option('-e', '--epochs','epochs',default=100,type=int,help="number of training iterations")
+# @click.option('-s', '--samples','n_samples',required=True,type=int,)
+@click.option('-S', '--SNPs','n_snps',required=True,type=int,help="number of SNPs to be sampled randomly")
+@click.option('-b', '--batch','batch',default=20,type=int,help="batch size") 
+@click.option('-r', '--ratio','ratio',default=0.8,type=float,help="train / eval ratio")
+@click.option('-w', '--width','width',default=15,type=int,help="image width must be a divisor of the number of individuals")
+@click.option('--path','path',required=True,type=str,help="path to the simulated data")
+@click.option('--verbose/;','debug',default=False,help="increase verbosity")
+@click.option('--deterministic/;','deterministic',default=False,help="set for reproducibility") 
 
 def train(epochs,n_snps,batch,ratio,width,path,deterministic,debug):
     """Train the model on the simulated data"""
@@ -544,7 +543,7 @@ def train(epochs,n_snps,batch,ratio,width,path,deterministic,debug):
         df_stats = pd.DataFrame(data)
         df_stats.to_csv('results/stats-r{ratio}.csv'.format(ratio=n_snps))
 
-cli = click.CommandCollection(sources=[cli1, cli2,cli3])
+cli = click.CommandCollection(sources=[cli2,cli3,cli1])
 
 def memory_limit():
     soft, hard = resource.getrlimit(resource.RLIMIT_AS)
