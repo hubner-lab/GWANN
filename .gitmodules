@@ -1,0 +1,3 @@
+[submodule "simulation/phenosim"]
+	path = simulation/phenosim
+	url = https://bitbucket.org/tguenther/phenosim_public.git
