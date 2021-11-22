@@ -104,8 +104,7 @@ def run(vcf,pheno_path,trait,model,output_path):
 
     print(tmp_vcf.shape)
 
-    final_vcf = torch.from_numpy(tmp_vcf).float().to(device)
-
+    final_vcf = torch.from_numpy(tmp_vcf).float()  # .to(device)
 
     embedding = MDS(n_components=1,random_state=0)
     mds_data = embedding.fit_transform(tmp_vcf.T)
@@ -117,25 +116,40 @@ def run(vcf,pheno_path,trait,model,output_path):
 
     # print(pop_padded)
 
-    n_snps = final_vcf.shape[0] 
+    n_snps = 1000 
+    # n_snps = final_vcf.shape[0] 
 
     if not Path(pheno_path).is_file():
         print("Invalid file pheno")
         exit(1)
 
     pheno = pd.read_csv(pheno_path,index_col=None,sep=',')
-    pheno_sorted = pheno.sort_values(by=trait,na_position='first')
 
-    # print(pheno_sorted[trait])
+    lambda_col = lambda col : int(re.findall(r'\d+',col)[0])
+    lambda_prefix = lambda col : re.findall(r'^([^\d]*)(?:\d+)$',col)[0]
+
+    pre = lambda_prefix(pheno['sample'][0])
+
+    ar = []
+    for sam in pheno['sample']:
+        ar.append(lambda_col(sam))
+
+    ar.sort()
+    ar_2 = [i for i in range(1,n_samples+1)]
+    missing = np.setxor1d(ar,ar_2)
+    for mi in missing:
+        pheno = pheno.append({'sample':'{0}{1}'.format(pre,"0"*(3 - len(str(mi))) + str(mi)), 'value':np.NaN}, ignore_index=True)
+
+    pheno_sorted = pheno.sort_values(by=[trait,"sample"],na_position='first')
 
     sorted_axes = np.array(pheno_sorted.index.values)
-    sorted_vcf = final_vcf[:,sorted_axes]
+    # sorted_vcf = final_vcf[:,sorted_axes]
 
     df_chrom = pd.DataFrame(chrom)
     chrom_labels = df_chrom[0].unique().tolist()
 
-    input_s = torch.split(sorted_vcf,n_snps)
-    output = torch.zeros((sorted_vcf.shape[0])).float().to(device)
+    input_s = torch.split(final_vcf,n_snps)
+    output = torch.zeros((final_vcf.shape[0])).float().to(device)
         
     net = Net(n_snps,n_samples,1,width).to(device)
     net.load_state_dict(torch.load(model)['model_state_dict'])
@@ -145,11 +159,13 @@ def run(vcf,pheno_path,trait,model,output_path):
         for j in range(len(input_s)):
             input_tmp = input_s[j]
             if n_snps - input_s[j].shape[0] > 0:
-                input_tmp = sorted_vcf[-n_snps:]
+                input_tmp = final_vcf[-n_snps:]
             pad_samples = n_samples - input_s[j].shape[1]
             pad_2 = torch.zeros((n_snps,pad_samples)).float().to(device) 
-            input = torch.cat((pad_2,input_tmp),1)
+            input = torch.cat((pad_2,input_tmp.to(device)),1)
             input = torch.unsqueeze(input,0)
+
+            input = input[:,:,sorted_axes]
 
             outputs = net(input,pop_padded)
             output[j*n_snps:j*n_snps + input_s[j].shape[0]] = outputs[:,-input_s[j].shape[0]:]
@@ -392,15 +408,15 @@ def train(epochs,n_snps,batch,ratio,width,path,deterministic,debug):
 
                 if debug:
                     x = inputs.detach().clone() 
-                    tmp_batch,tmp_n_snps = x.shape[:1]
+                    tmp_batch,tmp_n_snps,_ = x.shape
                     x = x.view(batch,tmp_n_snps,width,-1)
                     x = x.view(batch*tmp_n_snps,width,-1)
                     x = torch.unsqueeze(x,1)
 
                     pop_copy = pop.detach().clone() 
 
-                    pop_copy = pop_copy.view(batch,n_samples)
-                    pop_copy = pop_copy.view(batch,width,-1)
+                    pop_copy = pop_copy.view(tmp_batch,n_samples)
+                    pop_copy = pop_copy.view(tmp_batch,width,-1)
                     pop_copy = torch.unsqueeze(pop_copy,1)
 
                     # plt.matshow(pop_copy[0,0,:,:].cpu())

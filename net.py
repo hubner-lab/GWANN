@@ -74,6 +74,7 @@ class Net(nn.Module):
         pop = pop.repeat(SNP,1)
 
         output = x * pop 
+        # output = x 
 
         output = self.lin_seq(output)
         output = output.view(BATCH,SNP)
