@@ -86,7 +86,7 @@ def run(vcf,pheno_path,trait,model,output_path):
     n_samples = json_get('samples')
 
     if not Path("vcf_data").is_dir():
-        Path.mkdir("vcf_data")
+        Path("vcf_data").mkdir(parents=True,exist_ok=True)
 
     npz_loc = "vcf_data/{0}.npz".format(Path(vcf).stem)
 
@@ -94,7 +94,10 @@ def run(vcf,pheno_path,trait,model,output_path):
         allel.vcf_to_npz(vcf, npz_loc, fields='*', overwrite=True,chunk_length=8192,buffer_size=8192)
 
     callset = np.load(npz_loc,allow_pickle=True)
+
+
     vcf = callset['calldata/GT']
+    vcf_samples = callset['samples']
     chrom = callset['variants/CHROM']
 
     device = torch.device("cuda:0" if torch.cuda.is_available() else "cpu")
@@ -125,25 +128,16 @@ def run(vcf,pheno_path,trait,model,output_path):
 
     pheno = pd.read_csv(pheno_path,index_col=None,sep=',')
 
-    lambda_col = lambda col : int(re.findall(r'\d+',col)[0])
-    lambda_prefix = lambda col : re.findall(r'^([^\d]*)(?:\d+)$',col)[0]
+    _,index_samples,_ = np.intersect1d(vcf_samples,pheno["sample"],return_indices=True)
 
-    pre = lambda_prefix(pheno['sample'][0])
-
-    ar = []
-    for sam in pheno['sample']:
-        ar.append(lambda_col(sam))
-
-    ar.sort()
-    ar_2 = [i for i in range(1,n_samples+1)]
-    missing = np.setxor1d(ar,ar_2)
-    for mi in missing:
-        pheno = pheno.append({'sample':'{0}{1}'.format(pre,"0"*(3 - len(str(mi))) + str(mi)), 'value':np.NaN}, ignore_index=True)
+    # df_ss = pd.DataFrame(ss,columns=['sample'])
+    # pheno = pd.concat([df_ss,pheno],axis=0)
+    final_vcf = final_vcf[:,index_samples]
 
     pheno_sorted = pheno.sort_values(by=[trait,"sample"],na_position='first')
 
     sorted_axes = np.array(pheno_sorted.index.values)
-    # sorted_vcf = final_vcf[:,sorted_axes]
+    sorted_vcf = final_vcf[:,sorted_axes]
 
     df_chrom = pd.DataFrame(chrom)
     chrom_labels = df_chrom[0].unique().tolist()
@@ -158,16 +152,16 @@ def run(vcf,pheno_path,trait,model,output_path):
     with torch.no_grad():
         for j in range(len(input_s)):
             input_tmp = input_s[j]
-            if n_snps - input_s[j].shape[0] > 0:
-                input_tmp = final_vcf[-n_snps:]
-            pad_samples = n_samples - input_s[j].shape[1]
+            if n_snps - input_tmp.shape[0] > 0:
+                input_tmp = sorted_vcf[-n_snps:]
+
+            pad_samples = n_samples - input_tmp.shape[1]
             pad_2 = torch.zeros((n_snps,pad_samples)).float().to(device) 
             input = torch.cat((pad_2,input_tmp.to(device)),1)
             input = torch.unsqueeze(input,0)
 
-            input = input[:,:,sorted_axes]
-
             outputs = net(input,pop_padded)
+
             output[j*n_snps:j*n_snps + input_s[j].shape[0]] = outputs[:,-input_s[j].shape[0]:]
 
 
@@ -351,7 +345,7 @@ def train(epochs,n_snps,batch,ratio,width,path,deterministic,debug):
     max_accuracy = 0
     
     if not Path("models").is_dir():
-        Path.mkdir("models")
+        Path("models").mkdir(parents=True,exist_ok=True)
 
     clip_grad_norm = 5 
     e = 0
@@ -409,6 +403,10 @@ def train(epochs,n_snps,batch,ratio,width,path,deterministic,debug):
                 if debug:
                     x = inputs.detach().clone() 
                     tmp_batch,tmp_n_snps,_ = x.shape
+
+                    if tmp_batch != batch:
+                        continue 
+
                     x = x.view(batch,tmp_n_snps,width,-1)
                     x = x.view(batch*tmp_n_snps,width,-1)
                     x = torch.unsqueeze(x,1)

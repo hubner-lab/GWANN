@@ -38,9 +38,9 @@ $ pip install -r requirements.txt
 # Simulate 100 popluations with 10000 SNPS, 1 subpopulation of 300 individuals, and 1 causative SNP 
 $ python3 GWANN.py simulate -p 10000 -P 1 -s 300 -n 100 -S 1
 
-# Train the network for 100 epochs with a randomly sampled 50 SNP (causative SNP included)
+# Train the network for 500 epochs with a randomly sampled 30 SNP (causative SNP included)
 # a training-validation ratio of 70/30, image width of 15 columns and the path to the simulated data 
-$ python3 GWANN.py train -e 100 -S 50 -r 0.7 -w 15 --path simulation/data/ --verbose
+$ python3 GWANN.py train -e 500 -S 30 -r 0.7 -w 15 --path simulation/data/ --verbose
 
 # Predict causative SNPs on real data INPUT.vcf.gz with trait Plant_Height 
 # using the model generated in previous step and output results to output.csv and output.png
