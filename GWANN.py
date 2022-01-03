@@ -234,8 +234,9 @@ def cli2():
 @click.option('-m', '--maf','maf',default=0.05,type=float,help="minor allele frequency")
 @click.option('--miss','miss',default=0.03,type=float,help="proportion of missing data")
 @click.option('--equal_variance/;','equal',default=False,help="set this if equal variance is expected among SNPs (ignore for single SNP)")
+@click.option('--verbose/;','debug',default=False,help="increase verbosity")
 
-def simulate(pop,subpop,n_samples,n_sim,n_snps,maf,miss,equal):
+def simulate(pop,subpop,n_samples,n_sim,n_snps,maf,miss,equal,debug):
     """Simulate training data"""
 
     # assert width < n_samples ,"image width is bigger than the number of samples"
@@ -250,13 +251,12 @@ def simulate(pop,subpop,n_samples,n_sim,n_snps,maf,miss,equal):
     cpus = multiprocessing.cpu_count()
     pool = multiprocessing.Pool(cpus)
 
-
-
     tmp = (n_samples // subpop)
     tmp2 = n_samples - tmp * subpop 
     samples_str = " ".join([str(tmp)] * (subpop-1) + [str(tmp + tmp2)])
 
-    genome_command = shlex.split("genome -s {pop} -pop {n_pop} {samples} -seed".format(pop=pop,n_pop=subpop,samples=samples_str))
+    genome_exec = 'genome'
+    genome_command = shlex.split("{genome} -s {pop} -pop {n_pop} {samples} -seed".format(genome=genome_exec, pop=pop,n_pop=subpop,samples=samples_str))
     phenosim_command = "python2 simulation/phenosim/phenosim.py -i G -f simulation/data/genome{{0}}.txt --outfile simulation/data/{{0}} --maf_r {maf},1.0 --maf_c {maf} --miss {miss}".format(maf=maf,miss=miss)
 
     if n_snps > 1:
@@ -270,10 +270,16 @@ def simulate(pop,subpop,n_samples,n_sim,n_snps,maf,miss,equal):
         var_str = np.array2string(variance,precision=5,separator=',',formatter={'float_kind':lambda x: "%.5f" % x})
         var_str = re.sub("\[|\s*|\]","",var_str)
         phenosim_command += " -n {snps} -v {var}".format(snps=n_snps,var=var_str)
+    
+    try:
+        if debug:
+            print('mapping using {} cpus'.format(cpus))
 
-    ss = partial(simulate_helper,genome_command,phenosim_command,seed_arr)
-    pool.map(ss,range(n_sim))
-
+        ss = partial(simulate_helper,genome_command,phenosim_command,seed_arr)
+        pool.map(ss,range(n_sim))
+    except OSError:
+        if not os.path.exists(genome_exec):
+            raise click.ClickException('genome simulator not found') 
 
 @click.group()
 def cli3():
