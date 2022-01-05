@@ -122,9 +122,8 @@ def run(vcf,pheno_path,trait,model,output_path):
 
     n_snps = 1000 
     # n_snps = final_vcf.shape[0] 
-    if debug:
-        print('final_vcf', final_vcf.shape)
-        print('n_snps', n_snps)
+    print('final_vcf', final_vcf.shape)
+    print('n_snps', n_snps)
 
     if not Path(pheno_path).is_file():
         print("Invalid file pheno")
@@ -265,10 +264,10 @@ def simulate(pop,subpop,n_samples,n_sim,n_snps,maf,miss,equal,debug):
     tmp2 = n_samples - tmp * subpop 
     samples_str = " ".join([str(tmp)] * (subpop-1) + [str(tmp + tmp2)])
 
-    sim_path = 'simulation/data/'
+    sim_path = 'simulation/data'
     genome_exec = './genome'
     genome_command = shlex.split("{genome} -s {pop} -pop {n_pop} {samples} -seed".format(genome=genome_exec, pop=pop,n_pop=subpop,samples=samples_str))
-    phenosim_command = "python2 simulation/phenosim/phenosim.py -i G -f {sim_path}genome{{0}}.txt --outfile {sim_path}{{0}} --maf_r {maf},1.0 --maf_c {maf} --miss {miss}".format(sim_path=sim_path,maf=maf,miss=miss)
+    phenosim_command = "python2 simulation/phenosim/phenosim.py -i G -f {sim_path}/genome{{0}}.txt --outfile {sim_path}/{{0}} --maf_r {maf},1.0 --maf_c {maf} --miss {miss}".format(sim_path=sim_path,maf=maf,miss=miss)
 
     if n_snps > 1:
 
@@ -294,8 +293,8 @@ def simulate(pop,subpop,n_samples,n_sim,n_snps,maf,miss,equal,debug):
         if not os.path.exists(genome_exec):
             raise click.ClickException('genome simulator not found') 
     if debug:
-        genome_fcount = len(glob('{}genome*.txt'.format(sim_path)))
-        emma_fcount = len(glob('{}*.causal'.format(sim_path)))
+        genome_fcount = len(glob('{}/genome*.txt'.format(sim_path)))
+        emma_fcount = len(glob('{}/*.causal'.format(sim_path)))
         print('genome sims: {}'.format(genome_fcount))
         print('emma sims: {}'.format(emma_fcount))
 
@@ -322,6 +321,10 @@ def train(epochs,n_snps,batch,ratio,width,sim_path,deterministic,debug):
     
     json_update('width',width)
     n_samples = json_get('samples')
+    results_path = 'results'
+
+    if not os.path.exists(results_path):
+        os.mkdir(results_path)
 
     device = torch.device("cuda:0" if torch.cuda.is_available() else "cpu")
 
@@ -543,7 +546,7 @@ def train(epochs,n_snps,batch,ratio,width,sim_path,deterministic,debug):
                     ax[1,1].matshow(avr_TN.cpu())
 
                 fig.canvas.draw()
-                fig.savefig('results/matrix.png'.format(e=e))
+                fig.savefig('{results_path}/matrix.png'.format(results_path=results_path,e=e))
 
      
         else:
@@ -580,7 +583,7 @@ def train(epochs,n_snps,batch,ratio,width,sim_path,deterministic,debug):
     if debug:
         data = {'TP':TP_arr,'TN':TN_arr,'FP':FP_arr,'FN':FN_arr,'loss':loss_arr}
         df_stats = pd.DataFrame(data)
-        df_stats.to_csv('results/stats-r{ratio}.csv'.format(ratio=n_snps))
+        df_stats.to_csv('{results_path}/stats-r{ratio}.csv'.format(results_path=results_path,ratio=n_snps))
 
 cli = click.CommandCollection(sources=[cli2,cli3,cli1])
 
