@@ -336,16 +336,10 @@ def train(epochs,n_snps,batch,ratio,width,sim_path,deterministic,debug):
         torch.use_deterministic_algorithms(True)
         os.environ["CUBLAS_WORKSPACE_CONFIG"]=":16:8"
 
-    print('n_samples', n_samples)  
     full_dataset = DatasetPhenosim(n_samples,n_snps,sim_path)
 
     if debug:
-        print(full_dataset.shape)
-        #full_dataset.__len__
-        #genotype_path  = "{path}*320.emma_geno".format(path=path)
-        #data_G = pd.read_csv(genotype_path,index_col=None,header=None,sep='\t').fillna(-1)
-     
-
+        print(full_dataset.shapes())
     train_size = int(ratio * len(full_dataset))
     test_size =  len(full_dataset) - train_size
 
@@ -353,7 +347,6 @@ def train(epochs,n_snps,batch,ratio,width,sim_path,deterministic,debug):
 
     dataloader_train = DataLoader(train_dataset, batch_size=batch,shuffle=True, num_workers=0)
     dataloader_test =  DataLoader(test_dataset,  batch_size=batch,shuffle=True, num_workers=0)
-
 
     net = Net(n_snps,n_samples,batch,width).to(device)
 

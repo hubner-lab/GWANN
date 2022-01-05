@@ -44,13 +44,9 @@ class DatasetPhenosim(Dataset):
     def train(self):
         self.eval_b = False
 
-    def shape(self):
-        shapes = {'input' : [], 'output' : [], 'population' : []}
-        for i in range(self.__len__()):
-            output = self.__getitem__(i)
-            for key in shapes.key():
-                shapes[key].append(output[key].shape)
-        return shapes
+    def shapes(self):
+        idx = 0
+        return [(key, self.__getitem__(idx)[key].detach().numpy().shape) for key in self.__getitem__(idx).keys()]
 
     def __getitem__(self,idx):
 
