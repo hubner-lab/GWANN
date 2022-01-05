@@ -62,21 +62,32 @@ class Net(nn.Module):
 
         BATCH,SNP,SAMPLES = x.shape
 
+        print('1 x', x.shape)
         x = x.view(BATCH,SNP,self.width,-1)
+        print('1a', x.shape)
         x = x.view(BATCH*SNP,self.width,-1)
+        print('1b', x.shape)
         x = torch.unsqueeze(x,1)
 
+        print('2', x.shape)
         x = self.sequential(x)
         x = torch.flatten(x, 1)
+        print('3 x', x.shape)
 
+        print('4 pop', pop.shape)
         pop = pop.view(BATCH,SAMPLES)
         pop = self.pop_seq(pop)
+        print('4a', pop.shape)
         pop = pop.repeat(SNP,1)
+        print('5 pop', pop.shape)
 
         output = x * pop 
+        print('6', output.shape)
         # output = x 
 
         output = self.lin_seq(output)
+        print('7', output.shape)
         output = output.view(BATCH,SNP)
+        print('8', output.shape)
 
         return output

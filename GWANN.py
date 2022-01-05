@@ -295,8 +295,7 @@ def simulate(pop,subpop,n_samples,n_sim,n_snps,maf,miss,equal,debug):
     if debug:
         genome_fcount = len(glob('{}/genome*.txt'.format(sim_path)))
         emma_fcount = len(glob('{}/*.causal'.format(sim_path)))
-        print('genome sims: {}'.format(genome_fcount))
-        print('emma sims: {}'.format(emma_fcount))
+        print('n simulations: expected={0}, genomes={1}, phenotype{2}'.format(n_sim,genome_fcount,emma_fcount))
 
 @click.group()
 def cli3():
@@ -305,7 +304,7 @@ def cli3():
 @cli3.command()
 @click.option('-e', '--epochs','epochs',default=100,type=int,help="number of training iterations")
 # @click.option('-s', '--samples','n_samples',required=True,type=int,)
-@click.option('-S', '--SNPs','n_snps',required=True,type=int,help="number of SNPs to be sampled randomly")
+@click.option('-S', '--SNPs','n_snps',required=True,type=int,help="number of SNP sites to be randomlysampled per batch")
 @click.option('-b', '--batch','batch',default=20,type=int,help="batch size") 
 @click.option('-r', '--ratio','ratio',default=0.8,type=float,help="train / eval ratio")
 @click.option('-w', '--width','width',default=15,type=int,help="image width must be a divisor of the number of individuals")
@@ -358,8 +357,8 @@ def train(epochs,n_snps,batch,ratio,width,sim_path,deterministic,debug):
         print("CUDNN verison : {0}".format(torch.backends.cudnn.version()))
         print(net)
         print(device)
-        print("SNPs: {0} , samples: {1}, batch: {2} , width : {3}".format(n_snps,n_samples,batch,width))
-
+        print("simulated SNP sites: {0}, simulated sample genomes: {1}".format(n_snps,n_samples))
+        print("batch size: {0} , matrix width : {1}".format(batch,width))
 
 
     criterion = nn.MSELoss()
