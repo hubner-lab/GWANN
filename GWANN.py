@@ -33,6 +33,7 @@ import allel
 
 from pathlib import Path
 import re
+from glob import glob
 
 import subprocess
 import shlex
@@ -115,12 +116,15 @@ def run(vcf,pheno_path,trait,model,output_path):
 
     pop = torch.from_numpy(mds_data).float().to(device)
     pad_pop = torch.zeros((n_samples - pop.shape[0],1)).float().to(device) 
-    pop_padded =  torch.cat((pad_pop,pop),0)
+    pop_padded = torch.cat((pad_pop,pop),0)
 
     # print(pop_padded)
 
     n_snps = 1000 
     # n_snps = final_vcf.shape[0] 
+    if debug:
+        print('final_vcf', final_vcf.shape)
+        print('n_snps', n_snps)
 
     if not Path(pheno_path).is_file():
         print("Invalid file pheno")
@@ -214,11 +218,17 @@ def run(vcf,pheno_path,trait,model,output_path):
 
 def simulate_helper(genome_command,phenosim_command,seed,i):
     out_file = open('simulation/data/genome{0}.txt'.format(i),'w')
-    subprocess.call(genome_command + ["{0}".format(seed[i])],stdout=out_file)
-    out_file.close()
+    try:
+        subprocess.call(genome_command + ["{0}".format(seed[i])],stdout=out_file)
+        out_file.close()
+    except Exception as e:
+        raise Exception('genome failed for {i}; with {e}'.format(i=i, e=e))
 
-    phenosim_command = shlex.split(phenosim_command.format(i))
-    subprocess.call(phenosim_command,stdout=subprocess.DEVNULL)
+    try:
+        phenosim_command = shlex.split(phenosim_command.format(i))
+        subprocess.call(phenosim_command,stdout=subprocess.DEVNULL)
+    except Exception as e:
+        raise Exception('phenosim failed for {i}; with {e}'.format(i=i, e=e))
 
 
 @click.group()
@@ -255,9 +265,10 @@ def simulate(pop,subpop,n_samples,n_sim,n_snps,maf,miss,equal,debug):
     tmp2 = n_samples - tmp * subpop 
     samples_str = " ".join([str(tmp)] * (subpop-1) + [str(tmp + tmp2)])
 
-    genome_exec = 'genome'
+    sim_path = 'simulation/data/'
+    genome_exec = './genome'
     genome_command = shlex.split("{genome} -s {pop} -pop {n_pop} {samples} -seed".format(genome=genome_exec, pop=pop,n_pop=subpop,samples=samples_str))
-    phenosim_command = "python2 simulation/phenosim/phenosim.py -i G -f simulation/data/genome{{0}}.txt --outfile simulation/data/{{0}} --maf_r {maf},1.0 --maf_c {maf} --miss {miss}".format(maf=maf,miss=miss)
+    phenosim_command = "python2 simulation/phenosim/phenosim.py -i G -f {sim_path}genome{{0}}.txt --outfile {sim_path}{{0}} --maf_r {maf},1.0 --maf_c {maf} --miss {miss}".format(sim_path=sim_path,maf=maf,miss=miss)
 
     if n_snps > 1:
 
@@ -274,12 +285,19 @@ def simulate(pop,subpop,n_samples,n_sim,n_snps,maf,miss,equal,debug):
     try:
         if debug:
             print('mapping using {} cpus'.format(cpus))
-
+            print('output dir: {}'.format(sim_path))
+            print('genome params: population={pop}, n_pop={n_pop}, samples={samples}'.format(pop=pop,n_pop=subpop,samples=samples_str))
+            print('phenosim params: i= G, maf_c={maf}, maf_r={maf}, miss={miss}'.format(maf=maf,miss=miss))
         ss = partial(simulate_helper,genome_command,phenosim_command,seed_arr)
         pool.map(ss,range(n_sim))
     except OSError:
         if not os.path.exists(genome_exec):
             raise click.ClickException('genome simulator not found') 
+    if debug:
+        genome_fcount = len(glob('{}genome*.txt'.format(sim_path)))
+        emma_fcount = len(glob('{}*.causal'.format(sim_path)))
+        print('genome sims: {}'.format(genome_fcount))
+        print('emma sims: {}'.format(emma_fcount))
 
 @click.group()
 def cli3():
@@ -292,15 +310,15 @@ def cli3():
 @click.option('-b', '--batch','batch',default=20,type=int,help="batch size") 
 @click.option('-r', '--ratio','ratio',default=0.8,type=float,help="train / eval ratio")
 @click.option('-w', '--width','width',default=15,type=int,help="image width must be a divisor of the number of individuals")
-@click.option('--path','path',required=True,type=str,help="path to the simulated data")
+@click.option('--path','sim_path',required=True,type=str,help="path to the simulated data")
 @click.option('--verbose/;','debug',default=False,help="increase verbosity")
 @click.option('--deterministic/;','deterministic',default=False,help="set for reproducibility") 
 
-def train(epochs,n_snps,batch,ratio,width,path,deterministic,debug):
+def train(epochs,n_snps,batch,ratio,width,sim_path,deterministic,debug):
     """Train the model on the simulated data"""
 
     from net import Net
-    from dataset  import DatasetPhenosim,DatasetPhenosim
+    from dataset import DatasetPhenosim
     
     json_update('width',width)
     n_samples = json_get('samples')
@@ -318,8 +336,15 @@ def train(epochs,n_snps,batch,ratio,width,path,deterministic,debug):
         torch.use_deterministic_algorithms(True)
         os.environ["CUBLAS_WORKSPACE_CONFIG"]=":16:8"
 
-    full_dataset = DatasetPhenosim(n_samples,n_snps,path)
+    print('n_samples', n_samples)  
+    full_dataset = DatasetPhenosim(n_samples,n_snps,sim_path)
 
+    if debug:
+        print(full_dataset.shape)
+        #full_dataset.__len__
+        #genotype_path  = "{path}*320.emma_geno".format(path=path)
+        #data_G = pd.read_csv(genotype_path,index_col=None,header=None,sep='\t').fillna(-1)
+     
 
     train_size = int(ratio * len(full_dataset))
     test_size =  len(full_dataset) - train_size
