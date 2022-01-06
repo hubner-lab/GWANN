@@ -41,7 +41,7 @@ class Net(nn.Module):
         self.final = torch.numel(self.sequential(inputs))
 
         self.lin_seq = nn.Sequential(
-            nn.Linear(self.final ,10),
+            nn.Linear(self.final, 10),
             nn.Dropout(p=0.2),
             # nn.ReLU(),
             nn.Linear(10,1),
@@ -58,36 +58,27 @@ class Net(nn.Module):
         )
 
     def forward(self,x,pop):
-        # x shape: (batch,SNP,samples) 
-
         BATCH,SNP,SAMPLES = x.shape
-
-        print('1 x', x.shape)
+        #SAMPLES - number of individual simulated genomes, available for sampling
+        #SNP - number of unique SNP-sites (sampled randomly)
+        #BATCH - number of resamplings of the SNP-sites
+        #SNP * BATCH = total number of unique SNP-sites
+   
         x = x.view(BATCH,SNP,self.width,-1)
-        print('1a', x.shape)
         x = x.view(BATCH*SNP,self.width,-1)
-        print('1b', x.shape)
         x = torch.unsqueeze(x,1)
 
-        print('2', x.shape)
         x = self.sequential(x)
         x = torch.flatten(x, 1)
-        print('3 x', x.shape)
 
-        print('4 pop', pop.shape)
         pop = pop.view(BATCH,SAMPLES)
         pop = self.pop_seq(pop)
-        print('4a', pop.shape)
         pop = pop.repeat(SNP,1)
-        print('5 pop', pop.shape)
 
         output = x * pop 
-        print('6', output.shape)
         # output = x 
 
         output = self.lin_seq(output)
-        print('7', output.shape)
         output = output.view(BATCH,SNP)
-        print('8', output.shape)
 
         return output

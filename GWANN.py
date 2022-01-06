@@ -239,7 +239,7 @@ def cli2():
 @click.option('-P', '--number-of-subpopulations','subpop',required=True,type=int,help="number of expected subpopulations")
 @click.option('-s', '--samples','n_samples',required=True,type=int,help="number of individuals")
 @click.option('-n', '--number-of-simulation','n_sim',required=True,type=int,help="number of populations to be simulated")
-@click.option('-S', '--causal_snps','n_snps',default=1,type=int,help="number of causal SNPs expected per number of SNPs")
+@click.option('-S', '--causal_snps','n_snps',default=1,type=int,help="number of causal SNPs expected per number of SNP-sites")
 @click.option('-m', '--maf','maf',default=0.05,type=float,help="minor allele frequency")
 @click.option('--miss','miss',default=0.03,type=float,help="proportion of missing data")
 @click.option('--equal_variance/;','equal',default=False,help="set this if equal variance is expected among SNPs (ignore for single SNP)")
@@ -573,7 +573,6 @@ def train(epochs,n_snps,batch,ratio,width,sim_path,deterministic,debug):
             loss.backward()
             torch.nn.utils.clip_grad_norm_(net.parameters(), clip_grad_norm)
             optimizer.step()    
-
 
         if e % 100 == 0:
             scheduler.step()
