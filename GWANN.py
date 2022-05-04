@@ -311,8 +311,9 @@ def cli3():
 @click.option('--path','sim_path',required=True,type=str,help="path to the simulated data")
 @click.option('--verbose/;','debug',default=False,help="increase verbosity")
 @click.option('--deterministic/;','deterministic',default=False,help="set for reproducibility") 
+@click.option('--cpu/;','cpu',default=False,required=False,help="force training on cpu")
 
-def train(epochs,n_snps,batch,ratio,width,sim_path,deterministic,debug):
+def train(epochs,n_snps,batch,ratio,width,sim_path,deterministic,debug,cpu):
     """Train the model on the simulated data"""
 
     from net import Net
@@ -325,7 +326,10 @@ def train(epochs,n_snps,batch,ratio,width,sim_path,deterministic,debug):
     if not os.path.exists(results_path):
         os.mkdir(results_path)
 
-    device = torch.device("cuda:0" if torch.cuda.is_available() else "cpu")
+    if cpu:
+        device = 'cpu'
+    else:
+        device = torch.device("cuda:0" if torch.cuda.is_available() else "cpu")
 
     generator = torch.Generator()
 
