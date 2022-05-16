@@ -13,9 +13,11 @@ To facilitate the use of the CNN, the genotype 	information was converted into a
 * python2 (for [pheosim](https://bmcbioinformatics.biomedcentral.com/articles/10.1186/1471-2105-12-265)) 
 * python>=3.8
 
-## How To Start 
+## How to start 
 
-To clone and run this application, you'll need [Git](https://git-scm.com) and python pip. From your command line:
+To clone and run this application, you'll need [Git](https://git-scm.com) and python pip. 
+Genotype data should be in compressed vcf format and the trait file (phenotype) should be in csv format and contain two columns: samples names and the trait score. The trait file must have headers: use 'sample' for the samples names column and any trait name for the trait score column.
+From your command line:
 
 ```bash
 # Clone this repository
