@@ -74,11 +74,12 @@ def cli1():
 
 @click.option('--model','model',default="models/net.pt",help="path to the network model generated in the training step")
 @click.option('--output','output_path',default="results/GWAS",help="prefix of output plot and causative SNPs indexes in the VCF")
+@click.option('--cpu/;','cpu',default=False,required=False,help="force on cpu")
 
 # @click.option('-s', '--samples','n_samples',default=250,type=int)
 # @click.option('-w', '--width','width',default=10,type=int)
 
-def run(vcf,pheno_path,trait,model,output_path):
+def run(vcf,pheno_path,trait,model,output_path,cpu):
     """Run on real data"""
 
     from net import Net
@@ -101,7 +102,7 @@ def run(vcf,pheno_path,trait,model,output_path):
     vcf_samples = callset['samples']
     chrom = callset['variants/CHROM']
 
-    device = torch.device("cuda:0" if torch.cuda.is_available() else "cpu")
+    device = 'cpu' if cpu else torch.device("cuda:0" if torch.cuda.is_available() else "cpu")
 
     tmp_vcf = (vcf[:,:,0] + vcf[:,:,1]) / 2
     tmp_vcf[np.where(tmp_vcf == 0.5)] = 0 
@@ -120,8 +121,8 @@ def run(vcf,pheno_path,trait,model,output_path):
 
     # print(pop_padded)
 
-    n_snps = 1000 
-    # n_snps = final_vcf.shape[0] 
+    #n_snps = 1000 
+    n_snps = final_vcf.shape[0] 
     print('final_vcf', final_vcf.shape)
     print('n_snps', n_snps)
 
@@ -304,7 +305,7 @@ def cli3():
 @cli3.command()
 @click.option('-e', '--epochs','epochs',default=100,type=int,help="number of training iterations")
 # @click.option('-s', '--samples','n_samples',required=True,type=int,)
-@click.option('-S', '--SNPs','n_snps',required=True,type=int,help="number of SNP sites to be randomlysampled per batch")
+@click.option('-S', '--SNPs','n_snps',required=True,type=int,help="number of SNP sites to be randomly sampled per batch")
 @click.option('-b', '--batch','batch',default=20,type=int,help="batch size") 
 @click.option('-r', '--ratio','ratio',default=0.8,type=float,help="train / eval ratio")
 @click.option('-w', '--width','width',default=15,type=int,help="image width must be a divisor of the number of individuals")
@@ -326,10 +327,7 @@ def train(epochs,n_snps,batch,ratio,width,sim_path,deterministic,debug,cpu):
     if not os.path.exists(results_path):
         os.mkdir(results_path)
 
-    if cpu:
-        device = 'cpu'
-    else:
-        device = torch.device("cuda:0" if torch.cuda.is_available() else "cpu")
+    device = 'cpu' if cpu else torch.device("cuda:0" if torch.cuda.is_available() else "cpu")
 
     generator = torch.Generator()
 
