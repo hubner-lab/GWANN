@@ -1,7 +1,7 @@
 ## Table of contents
 * [General info](#general-info)
 * [Dependencies](#Dependencies)
-* [How To Start](#How-to-start)
+* [How to start](#How to start)
 * [Usage](#usage)
 
 ## General info
