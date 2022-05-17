@@ -35,7 +35,7 @@ $ pip install -r requirements.txt
 ## Example 
 
 ```bash
-# Simulate 100 popluations with 10000 SNPS, 1 subpopulation of 300 individuals, and 1 causative SNP 
+# Simulate 100 populations with 10000 SNPS, 1 subpopulation of 300 individuals, and 1 causative SNP
 $ python3 GWANN.py simulate -p 10000 -P 1 -s 300 -n 100 -S 1
 
 # Train the network for 500 epochs with a randomly sampled 30 SNP (causative SNP included)

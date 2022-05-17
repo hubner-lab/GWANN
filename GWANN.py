@@ -92,33 +92,30 @@ def run(vcf,pheno_path,trait,model,output_path,cpu):
 
     npz_loc = "vcf_data/{0}.npz".format(Path(vcf).stem)
 
+    print('save vcf')
     if not Path(npz_loc).is_file():
         allel.vcf_to_npz(vcf, npz_loc, fields='*', overwrite=True,chunk_length=8192,buffer_size=8192)
 
+    print('reload vcf')
     callset = np.load(npz_loc,allow_pickle=True)
 
-
+    print('parse vcf')
     vcf = callset['calldata/GT']
     vcf_samples = callset['samples']
     chrom = callset['variants/CHROM']
-
-    device = 'cpu' if cpu else torch.device("cuda:0" if torch.cuda.is_available() else "cpu")
-
     tmp_vcf = (vcf[:,:,0] + vcf[:,:,1]) / 2
     tmp_vcf[np.where(tmp_vcf == 0.5)] = 0 
+    #print(tmp_vcf.shape)
 
-    print(tmp_vcf.shape)
-
+    device = 'cpu' if cpu else torch.device("cuda:0" if torch.cuda.is_available() else "cpu")
     final_vcf = torch.from_numpy(tmp_vcf).float()  # .to(device)
 
     embedding = MDS(n_components=1,random_state=0)
     mds_data = embedding.fit_transform(tmp_vcf.T)
 
-
     pop = torch.from_numpy(mds_data).float().to(device)
     pad_pop = torch.zeros((n_samples - pop.shape[0],1)).float().to(device) 
     pop_padded = torch.cat((pad_pop,pop),0)
-
     # print(pop_padded)
 
     #n_snps = 1000 
@@ -132,11 +129,14 @@ def run(vcf,pheno_path,trait,model,output_path,cpu):
 
     pheno = pd.read_csv(pheno_path,index_col=None,sep=',')
 
-    _,index_samples,_ = np.intersect1d(vcf_samples,pheno["sample"],return_indices=True)
+    _,index_samples,pheno_indeces = np.intersect1d(vcf_samples,pheno['sample'],return_indices=True)
 
     # df_ss = pd.DataFrame(ss,columns=['sample'])
     # pheno = pd.concat([df_ss,pheno],axis=0)
     final_vcf = final_vcf[:,index_samples]
+
+    pheno = pheno.loc[pheno_indeces].reset_index()
+    #assert (vcf_samples == pheno['sample']).all()
 
     pheno_sorted = pheno.sort_values(by=[trait,"sample"],na_position='first')
 
@@ -160,7 +160,7 @@ def run(vcf,pheno_path,trait,model,output_path,cpu):
                 input_tmp = sorted_vcf[-n_snps:]
 
             pad_samples = n_samples - input_tmp.shape[1]
-            pad_2 = torch.zeros((n_snps,pad_samples)).float().to(device) 
+            pad_2 = torch.zeros((n_snps,pad_samples), device=device).float()
             input = torch.cat((pad_2,input_tmp.to(device)),1)
             input = torch.unsqueeze(input,0)
 
