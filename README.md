@@ -1,7 +1,7 @@
 ## Table of contents
 * [General info](#general-info)
 * [Dependencies](#Dependencies)
-* [How To Start](#How-To-Start)
+* [How to start](#How-to-start)
 * [Usage](#usage)
 
 ## General info
@@ -13,9 +13,11 @@ To facilitate the use of the CNN, the genotype 	information was converted into a
 * python2 (for [pheosim](https://bmcbioinformatics.biomedcentral.com/articles/10.1186/1471-2105-12-265)) 
 * python>=3.8
 
-## How To Start 
+## How to start 
 
-To clone and run this application, you'll need [Git](https://git-scm.com) and python pip. From your command line:
+To clone and run this application, you'll need [Git](https://git-scm.com) and python pip. 
+GWANN accepts Genotype data as compressed vcf format and a trait file (phenotype) in csv format with two columns: individuals names, and the trait scores for each individual. The trait file must contain headers where 'sample' should be used as header for the individuals names column and any trait name for the trait scores column.
+From your command line:
 
 ```bash
 # Clone this repository
