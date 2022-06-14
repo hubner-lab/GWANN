@@ -128,6 +128,10 @@ def run(vcf,pheno_path,trait,model,output_path,cpu):
         exit(1)
 
     pheno = pd.read_csv(pheno_path,index_col=None,sep=',')
+    if not 'sample' in pheno.keys():
+        raise click.ClickException('sample field missing in phenotype file')
+    if not trait in pheno.keys():
+        raise click.ClickException('trait field missing in phenotype file') 
 
     _,index_samples,index_samples_pheno = np.intersect1d(vcf_samples,pheno["sample"],return_indices=True)
 
@@ -137,7 +141,7 @@ def run(vcf,pheno_path,trait,model,output_path,cpu):
     pheno = pheno.loc[index_samples_pheno].reset_index()
     #assert (pheno["sample"] == vcf_samples[index_samples]).all()
 
-    pheno = pheno.loc[pheno_indeces].reset_index()
+    pheno = pheno.loc[index_samples_pheno].reset_index()
     #assert (vcf_samples == pheno['sample']).all()
 
     pheno_sorted = pheno.sort_values(by=[trait,"sample"],na_position='first')
