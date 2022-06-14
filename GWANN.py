@@ -33,6 +33,7 @@ import allel
 
 from pathlib import Path
 import re
+from glob import glob
 
 import subprocess
 import shlex
@@ -73,11 +74,12 @@ def cli1():
 
 @click.option('--model','model',default="models/net.pt",help="path to the network model generated in the training step")
 @click.option('--output','output_path',default="results/GWAS",help="prefix of output plot and causative SNPs indexes in the VCF")
+@click.option('--cpu/;','cpu',default=False,required=False,help="force on cpu")
 
 # @click.option('-s', '--samples','n_samples',default=250,type=int)
 # @click.option('-w', '--width','width',default=10,type=int)
 
-def run(vcf,pheno_path,trait,model,output_path):
+def run(vcf,pheno_path,trait,model,output_path,cpu):
     """Run on real data"""
 
     from net import Net
@@ -90,37 +92,36 @@ def run(vcf,pheno_path,trait,model,output_path):
 
     npz_loc = "vcf_data/{0}.npz".format(Path(vcf).stem)
 
+    print('save vcf')
     if not Path(npz_loc).is_file():
         allel.vcf_to_npz(vcf, npz_loc, fields='*', overwrite=True,chunk_length=8192,buffer_size=8192)
 
+    print('reload vcf')
     callset = np.load(npz_loc,allow_pickle=True)
 
-
+    print('parse vcf')
     vcf = callset['calldata/GT']
     vcf_samples = callset['samples']
     chrom = callset['variants/CHROM']
-
-    device = torch.device("cuda:0" if torch.cuda.is_available() else "cpu")
-
     tmp_vcf = (vcf[:,:,0] + vcf[:,:,1]) / 2
     tmp_vcf[np.where(tmp_vcf == 0.5)] = 0 
+    #print(tmp_vcf.shape)
 
-    print(tmp_vcf.shape)
-
+    device = 'cpu' if cpu else torch.device("cuda:0" if torch.cuda.is_available() else "cpu")
     final_vcf = torch.from_numpy(tmp_vcf).float()  # .to(device)
 
     embedding = MDS(n_components=1,random_state=0)
     mds_data = embedding.fit_transform(tmp_vcf.T)
 
-
     pop = torch.from_numpy(mds_data).float().to(device)
     pad_pop = torch.zeros((n_samples - pop.shape[0],1)).float().to(device) 
-    pop_padded =  torch.cat((pad_pop,pop),0)
-
+    pop_padded = torch.cat((pad_pop,pop),0)
     # print(pop_padded)
 
-    n_snps = 1000 
-    # n_snps = final_vcf.shape[0] 
+    #n_snps = 1000 
+    n_snps = final_vcf.shape[0] 
+    print('final_vcf', final_vcf.shape)
+    print('n_snps', n_snps)
 
     if not Path(pheno_path).is_file():
         print("Invalid file pheno")
@@ -135,6 +136,9 @@ def run(vcf,pheno_path,trait,model,output_path):
     final_vcf = final_vcf[:,index_samples]
     pheno = pheno.loc[index_samples_pheno].reset_index()
     #assert (pheno["sample"] == vcf_samples[index_samples]).all()
+
+    pheno = pheno.loc[pheno_indeces].reset_index()
+    #assert (vcf_samples == pheno['sample']).all()
 
     pheno_sorted = pheno.sort_values(by=[trait,"sample"],na_position='first')
 
@@ -158,7 +162,7 @@ def run(vcf,pheno_path,trait,model,output_path):
                 input_tmp = sorted_vcf[-n_snps:]
 
             pad_samples = n_samples - input_tmp.shape[1]
-            pad_2 = torch.zeros((n_snps,pad_samples)).float().to(device) 
+            pad_2 = torch.zeros((n_snps,pad_samples), device=device).float()
             input = torch.cat((pad_2,input_tmp.to(device)),1)
             input = torch.unsqueeze(input,0)
 
@@ -216,11 +220,17 @@ def run(vcf,pheno_path,trait,model,output_path):
 
 def simulate_helper(genome_command,phenosim_command,seed,i):
     out_file = open('simulation/data/genome{0}.txt'.format(i),'w')
-    subprocess.call(genome_command + ["{0}".format(seed[i])],stdout=out_file)
-    out_file.close()
+    try:
+        subprocess.call(genome_command + ["{0}".format(seed[i])],stdout=out_file)
+        out_file.close()
+    except Exception as e:
+        raise Exception('genome failed for {i}; with {e}'.format(i=i, e=e))
 
-    phenosim_command = shlex.split(phenosim_command.format(i))
-    subprocess.call(phenosim_command,stdout=subprocess.DEVNULL)
+    try:
+        phenosim_command = shlex.split(phenosim_command.format(i))
+        subprocess.call(phenosim_command,stdout=subprocess.DEVNULL)
+    except Exception as e:
+        raise Exception('phenosim failed for {i}; with {e}'.format(i=i, e=e))
 
 
 @click.group()
@@ -232,7 +242,7 @@ def cli2():
 @click.option('-P', '--number-of-subpopulations','subpop',required=True,type=int,help="number of expected subpopulations")
 @click.option('-s', '--samples','n_samples',required=True,type=int,help="number of individuals")
 @click.option('-n', '--number-of-simulation','n_sim',required=True,type=int,help="number of populations to be simulated")
-@click.option('-S', '--causal_snps','n_snps',default=1,type=int,help="number of causal SNPs expected per number of SNPs")
+@click.option('-S', '--causal_snps','n_snps',default=1,type=int,help="number of causal SNPs expected per number of SNP-sites")
 @click.option('-m', '--maf','maf',default=0.05,type=float,help="minor allele frequency")
 @click.option('--miss','miss',default=0.03,type=float,help="proportion of missing data")
 @click.option('--equal_variance/;','equal',default=False,help="set this if equal variance is expected among SNPs (ignore for single SNP)")
@@ -257,9 +267,10 @@ def simulate(pop,subpop,n_samples,n_sim,n_snps,maf,miss,equal,debug):
     tmp2 = n_samples - tmp * subpop 
     samples_str = " ".join([str(tmp)] * (subpop-1) + [str(tmp + tmp2)])
 
-    genome_exec = 'genome'
+    sim_path = 'simulation/data'
+    genome_exec = './genome'
     genome_command = shlex.split("{genome} -s {pop} -pop {n_pop} {samples} -seed".format(genome=genome_exec, pop=pop,n_pop=subpop,samples=samples_str))
-    phenosim_command = "python2 simulation/phenosim/phenosim.py -i G -f simulation/data/genome{{0}}.txt --outfile simulation/data/{{0}} --maf_r {maf},1.0 --maf_c {maf} --miss {miss}".format(maf=maf,miss=miss)
+    phenosim_command = "python2 simulation/phenosim/phenosim.py -i G -f {sim_path}/genome{{0}}.txt --outfile {sim_path}/{{0}} --maf_r {maf},1.0 --maf_c {maf} --miss {miss}".format(sim_path=sim_path,maf=maf,miss=miss)
 
     if n_snps > 1:
 
@@ -276,12 +287,18 @@ def simulate(pop,subpop,n_samples,n_sim,n_snps,maf,miss,equal,debug):
     try:
         if debug:
             print('mapping using {} cpus'.format(cpus))
-
+            print('output dir: {}'.format(sim_path))
+            print('genome params: population={pop}, n_pop={n_pop}, samples={samples}'.format(pop=pop,n_pop=subpop,samples=samples_str))
+            print('phenosim params: i= G, maf_c={maf}, maf_r={maf}, miss={miss}'.format(maf=maf,miss=miss))
         ss = partial(simulate_helper,genome_command,phenosim_command,seed_arr)
         pool.map(ss,range(n_sim))
     except OSError:
         if not os.path.exists(genome_exec):
             raise click.ClickException('genome simulator not found') 
+    if debug:
+        genome_fcount = len(glob('{}/genome*.txt'.format(sim_path)))
+        emma_fcount = len(glob('{}/*.causal'.format(sim_path)))
+        print('n simulations: expected={0}, genomes={1}, phenotype{2}'.format(n_sim,genome_fcount,emma_fcount))
 
 @click.group()
 def cli3():
@@ -290,24 +307,29 @@ def cli3():
 @cli3.command()
 @click.option('-e', '--epochs','epochs',default=100,type=int,help="number of training iterations")
 # @click.option('-s', '--samples','n_samples',required=True,type=int,)
-@click.option('-S', '--SNPs','n_snps',required=True,type=int,help="number of SNPs to be sampled randomly")
+@click.option('-S', '--SNPs','n_snps',required=True,type=int,help="number of SNP sites to be randomly sampled per batch")
 @click.option('-b', '--batch','batch',default=20,type=int,help="batch size") 
 @click.option('-r', '--ratio','ratio',default=0.8,type=float,help="train / eval ratio")
 @click.option('-w', '--width','width',default=15,type=int,help="image width must be a divisor of the number of individuals")
-@click.option('--path','path',required=True,type=str,help="path to the simulated data")
+@click.option('--path','sim_path',required=True,type=str,help="path to the simulated data")
 @click.option('--verbose/;','debug',default=False,help="increase verbosity")
 @click.option('--deterministic/;','deterministic',default=False,help="set for reproducibility") 
+@click.option('--cpu/;','cpu',default=False,required=False,help="force training on cpu")
 
-def train(epochs,n_snps,batch,ratio,width,path,deterministic,debug):
+def train(epochs,n_snps,batch,ratio,width,sim_path,deterministic,debug,cpu):
     """Train the model on the simulated data"""
 
     from net import Net
-    from dataset  import DatasetPhenosim,DatasetPhenosim
+    from dataset import DatasetPhenosim
     
     json_update('width',width)
     n_samples = json_get('samples')
+    results_path = 'results'
 
-    device = torch.device("cuda:0" if torch.cuda.is_available() else "cpu")
+    if not os.path.exists(results_path):
+        os.mkdir(results_path)
+
+    device = 'cpu' if cpu else torch.device("cuda:0" if torch.cuda.is_available() else "cpu")
 
     generator = torch.Generator()
 
@@ -320,9 +342,10 @@ def train(epochs,n_snps,batch,ratio,width,path,deterministic,debug):
         torch.use_deterministic_algorithms(True)
         os.environ["CUBLAS_WORKSPACE_CONFIG"]=":16:8"
 
-    full_dataset = DatasetPhenosim(n_samples,n_snps,path)
+    full_dataset = DatasetPhenosim(n_samples,n_snps,sim_path)
 
-
+    if debug:
+        print(full_dataset.shapes())
     train_size = int(ratio * len(full_dataset))
     test_size =  len(full_dataset) - train_size
 
@@ -331,7 +354,6 @@ def train(epochs,n_snps,batch,ratio,width,path,deterministic,debug):
     dataloader_train = DataLoader(train_dataset, batch_size=batch,shuffle=True, num_workers=0)
     dataloader_test =  DataLoader(test_dataset,  batch_size=batch,shuffle=True, num_workers=0)
 
-
     net = Net(n_snps,n_samples,batch,width).to(device)
 
     if debug:
@@ -339,8 +361,8 @@ def train(epochs,n_snps,batch,ratio,width,path,deterministic,debug):
         print("CUDNN verison : {0}".format(torch.backends.cudnn.version()))
         print(net)
         print(device)
-        print("SNPs: {0} , samples: {1}, batch: {2} , width : {3}".format(n_snps,n_samples,batch,width))
-
+        print("simulated SNP sites: {0}, simulated sample genomes: {1}".format(n_snps,n_samples))
+        print("batch size: {0} , matrix width : {1}".format(batch,width))
 
 
     criterion = nn.MSELoss()
@@ -527,7 +549,7 @@ def train(epochs,n_snps,batch,ratio,width,path,deterministic,debug):
                     ax[1,1].matshow(avr_TN.cpu())
 
                 fig.canvas.draw()
-                fig.savefig('results/matrix.png'.format(e=e))
+                fig.savefig('{results_path}/matrix.png'.format(results_path=results_path,e=e))
 
      
         else:
@@ -556,7 +578,6 @@ def train(epochs,n_snps,batch,ratio,width,path,deterministic,debug):
             torch.nn.utils.clip_grad_norm_(net.parameters(), clip_grad_norm)
             optimizer.step()    
 
-
         if e % 100 == 0:
             scheduler.step()
 
@@ -564,7 +585,7 @@ def train(epochs,n_snps,batch,ratio,width,path,deterministic,debug):
     if debug:
         data = {'TP':TP_arr,'TN':TN_arr,'FP':FP_arr,'FN':FN_arr,'loss':loss_arr}
         df_stats = pd.DataFrame(data)
-        df_stats.to_csv('results/stats-r{ratio}.csv'.format(ratio=n_snps))
+        df_stats.to_csv('{results_path}/stats-r{ratio}.csv'.format(results_path=results_path,ratio=n_snps))
 
 cli = click.CommandCollection(sources=[cli2,cli3,cli1])
 

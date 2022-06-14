@@ -31,8 +31,12 @@ class DatasetPhenosim(Dataset):
         self.full_dataset = False 
 
     def __len__(self):
-        s = glob.glob("{path}*0.emma_geno".format(path=self.root_path))
-        return len(s) 
+        files = glob.glob("{path}*0.emma_geno".format(path=self.root_path))
+        try:
+            assert len(files) > 0
+        except:
+            raise click.ClickException('no simulation files found')
+        return len(files) 
 
     def eval_(self):
         self.eval_b = True
@@ -40,6 +44,9 @@ class DatasetPhenosim(Dataset):
     def train(self):
         self.eval_b = False
 
+    def shapes(self):
+        idx = 0
+        return [(key, self.__getitem__(idx)[key].detach().numpy().shape) for key in self.__getitem__(idx).keys()]
 
     def __getitem__(self,idx):
 
@@ -100,10 +107,12 @@ class DatasetPhenosim(Dataset):
 
         data_output = np.empty(data_input.shape[0])
         
-
-        # data_output[:] = 0 
-        data_output[:] = -1 
-        data_output[causal_SNP] = 1 
+        #ISSUE?
+        if 0: 
+            data_output[:] = 0 
+        else:
+            data_output[:] = -1 
+            data_output[causal_SNP] = 1 
 
         # population = pd.DataFrame(self.init_pop)
         # population = population.reindex(sorted_axes).to_numpy().flatten()
