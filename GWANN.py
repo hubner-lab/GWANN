@@ -129,11 +129,13 @@ def run(vcf,pheno_path,trait,model,output_path,cpu):
 
     pheno = pd.read_csv(pheno_path,index_col=None,sep=',')
 
-    _,index_samples,pheno_indeces = np.intersect1d(vcf_samples,pheno['sample'],return_indices=True)
+    _,index_samples,index_samples_pheno = np.intersect1d(vcf_samples,pheno["sample"],return_indices=True)
 
     # df_ss = pd.DataFrame(ss,columns=['sample'])
     # pheno = pd.concat([df_ss,pheno],axis=0)
     final_vcf = final_vcf[:,index_samples]
+    pheno = pheno.loc[index_samples_pheno].reset_index()
+    #assert (pheno["sample"] == vcf_samples[index_samples]).all()
 
     pheno = pheno.loc[pheno_indeces].reset_index()
     #assert (vcf_samples == pheno['sample']).all()
