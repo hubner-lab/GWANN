@@ -140,8 +140,6 @@ def run(vcf,pheno_path,trait,model,output_path,cpu):
     final_vcf = final_vcf[:,index_samples]
     pheno = pheno.loc[index_samples_pheno].reset_index()
     #assert (pheno["sample"] == vcf_samples[index_samples]).all()
-
-    pheno = pheno.loc[index_samples_pheno].reset_index()
     #assert (vcf_samples == pheno['sample']).all()
 
     pheno_sorted = pheno.sort_values(by=[trait,"sample"],na_position='first')
