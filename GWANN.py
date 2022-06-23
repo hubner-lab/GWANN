@@ -154,8 +154,7 @@ def run(vcf,pheno_path,trait,model,output_path,cpu):
     output = torch.zeros((final_vcf.shape[0])).float().to(device)
         
     net = Net(n_snps,n_samples,1,width).to(device)
-    net.load_state_dict(torch.load(model)['model_state_dict'])
-    net = net.to(device)
+    net.load_state_dict(torch.load(model,torch.device(device))['model_state_dict'])
 
     net.eval()
     with torch.no_grad():
