@@ -7,7 +7,7 @@ import torch.autograd.profiler as profiler
 import torch.nn.utils.prune as prune
 import torchvision
 import torchvision.transforms as T
-
+import click
 import numpy as np
 import pandas as pd
 

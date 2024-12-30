@@ -1,9 +1,7 @@
 import click # command line 
-
 import sys
 import io
 import os
-
 import torch
 import torch.nn as nn
 import torch.nn.functional as F 
@@ -13,9 +11,7 @@ import torch.autograd.profiler as profiler
 import torch.nn.utils.prune as prune
 import torchvision
 import torchvision.transforms as T
-
 # torch.backends.cudnn.benchmark = False
-
 import pandas as pd
 import numpy as np
 import matplotlib.pyplot as plt
@@ -25,39 +21,186 @@ import time
 import functools
 import operator
 from functools import partial
+from typing import List, Optional, Tuple
 from sklearn.manifold import MDS
-
 # import sgkit as sg
 # from sgkit.io.vcf import partition_into_regions, vcf_to_zarr
 import allel
-
 from pathlib import Path
 import re
 from glob import glob
-
 import subprocess
 import shlex
 import multiprocessing
-
 import csv 
 import json
-
 import resource
+from const import * 
 
-JSON_FILE = Path("data.json")
-current_dict = None 
+def json_update(key: str ,param:int) -> None:
+    """
+    Update the JSON file with a new value for the specified key.
 
-def json_update(key,param):
+    Parameters:
+    key (str): The key in the JSON file to update.
+    param (int): The new value to set for the specified key.
+    """
     tmp_dict = json.loads(JSON_FILE.read_text())
     tmp_dict[key] = param 
-    current_dict = tmp_dict
     JSON_FILE.write_text(json.dumps(tmp_dict))
 
-def json_get(key):
+
+def seed(pop: int) -> np.ndarray:
+    """
+    Generates a seeded population array with random integers added to each element.
+
+    Parameters:
+    pop (int): The size of the population array to generate.
+
+    Returns:
+    np.ndarray: An array of integers where each element is a unique integer from 0 to pop-1 
+                with a random integer between LOWER_BOUND=1 and UPPER_BOUND=1000000 added to it.
+    """
+
+    return np.array(list(range(pop))) + np.random.randint(LOWER_BOUND, UPPER_BOUND)
+
+
+
+def generate_commands(pop: int, subpop: int, n_samples: int, maf: float, miss: float) -> Tuple[List[str], str]:
+    """
+    Generate genome and phenosim commands based on given parameters.
+
+    Parameters:
+        pop (int): Population size.
+        subpop (int): Number of subpopulations.
+        n_samples (int): Total number of samples.
+        maf (float): Minor allele frequency.
+        miss (float): Missing data rate.
+
+    Returns:
+        tuple: A tuple containing the genome command (list) and the phenosim command (str).
+    """
+    # Calculate sample distribution
+    tmp = (n_samples // subpop)
+    tmp2 = n_samples - tmp * subpop
+    samples_str = " ".join([str(tmp)] * (subpop - 1) + [str(tmp + tmp2)])
+
+    # Construct genome command
+    genome_command = shlex.split(f"{GENOME_EXE} -s {pop} -pop {subpop} {samples_str} -seed")
+
+    # Construct phenosim command
+    phenosim_command = (
+        f"python2 simulation/phenosim/phenosim.py -i G "
+        f"-f {SIM_PATH}/genome{{0}}.txt --outfile {SIM_PATH}/{{0}} "
+        f"--maf_r {maf},1.0 --maf_c {maf} --miss {miss}"
+    )
+
+    return genome_command, phenosim_command, samples_str
+
+
+def json_get(key:str):
+    """get the value of the key in the data.json file"""
     if current_dict is None:
         tmp_dict = json.loads(JSON_FILE.read_text())
         return tmp_dict[key] 
     return current_dict[key]
+
+
+
+def configure_deterministic_behavior(deterministic: bool, seed: Optional[int] = 0) -> torch.Generator:
+    """
+    Configures deterministic behavior for PyTorch, NumPy, and Python's random module.
+
+    Parameters:
+        deterministic (bool): Whether to enable deterministic behavior.
+        seed (Optional[int]): The seed value to use for random number generators. Defaults to 0.
+
+    Returns:
+        torch.Generator: A PyTorch random number generator with the specified seed (if deterministic).
+    """
+    generator = torch.Generator()
+
+    if deterministic:
+        # Set seeds for reproducibility
+        torch.manual_seed(seed)
+        random.seed(seed)
+        np.random.seed(seed)
+        generator.manual_seed(seed)
+
+        # Configure PyTorch for deterministic algorithms
+        torch.use_deterministic_algorithms(True)
+        os.environ["CUBLAS_WORKSPACE_CONFIG"] = ":16:8"
+
+    return generator
+
+
+def split_and_create_dataloaders(
+    full_dataset: Dataset, 
+    ratio: float, 
+    batch_size: int, 
+    generator: torch.Generator
+) -> Tuple[DataLoader, DataLoader]:
+    """
+    Splits a dataset into training and testing datasets and creates corresponding DataLoaders.
+
+    Parameters:
+        full_dataset (Dataset): The complete dataset to split.
+        ratio (float): The ratio of the dataset to use for training (0 < ratio < 1).
+        batch_size (int): The batch size for the DataLoaders.
+        generator (torch.Generator): A PyTorch generator for reproducibility.
+
+    Returns:
+        Tuple[DataLoader, DataLoader]: The training and testing DataLoaders.
+    """
+    # Calculate the sizes of the train and test datasets
+    train_size = int(ratio * len(full_dataset))
+    test_size = len(full_dataset) - train_size
+
+    # Split the dataset into train and test datasets
+    train_dataset, test_dataset = torch.utils.data.random_split(
+        full_dataset, [train_size, test_size], generator
+    )
+
+    # Create DataLoaders for the train and test datasets
+    dataloader_train = DataLoader(
+        train_dataset, batch_size=batch_size, shuffle=True, num_workers=0
+    )
+    dataloader_test = DataLoader(
+        test_dataset, batch_size=batch_size, shuffle=True, num_workers=0
+    )
+
+    return dataloader_train, dataloader_test
+
+
+def debug_info(
+    debug: bool, 
+    net: torch.nn.Module, 
+    device: torch.device, 
+    n_snps: int, 
+    n_samples: int, 
+    batch: int, 
+    width: int
+) -> None:
+    """
+    Print debugging information if debugging is enabled.
+
+    Parameters:
+        debug (bool): Whether to enable debug printing.
+        torch (torch): The PyTorch module for accessing version info.
+        net (torch.nn.Module): The neural network model.
+        device (torch.device): The device being used (CPU/GPU).
+        n_snps (int): Number of simulated SNP sites.
+        n_samples (int): Number of simulated sample genomes.
+        batch (int): Batch size.
+        width (int): Matrix width.
+    """
+    if debug:
+        print("CUDA version : {0}".format(torch.version.cuda))
+        print("CUDNN version : {0}".format(torch.backends.cudnn.version()))
+        print(net)
+        print(device)
+        print("Simulated SNP sites: {0}, Simulated sample genomes: {1}".format(n_snps, n_samples))
+        print("Batch size: {0}, Matrix width: {1}".format(batch, width))
 
 
 def num_sort(test_string):
@@ -221,12 +364,12 @@ def run(vcf,pheno_path,trait,model,output_path,cpu):
 
 
 def simulate_helper(genome_command,phenosim_command,seed,i):
-    out_file = open('simulation/data/genome{0}.txt'.format(i),'w')
+    out_file = open(f'{SIM_GENOM_PATH}{i}.txt','w')
     try:
         subprocess.call(genome_command + ["{0}".format(seed[i])],stdout=out_file)
         out_file.close()
     except Exception as e:
-        raise Exception('genome failed for {i}; with {e}'.format(i=i, e=e))
+        raise Exception(f'genome failed for {i}; with {e}')
 
     try:
         phenosim_command = shlex.split(phenosim_command.format(i))
@@ -250,29 +393,27 @@ def cli2():
 @click.option('--equal_variance/;','equal',default=False,help="set this if equal variance is expected among SNPs (ignore for single SNP)")
 @click.option('--verbose/;','debug',default=False,help="increase verbosity")
 
+
+
+
+
 def simulate(pop,subpop,n_samples,n_sim,n_snps,maf,miss,equal,debug):
     """Simulate training data"""
 
     # assert width < n_samples ,"image width is bigger than the number of samples"
     # assert n_samples % width == 0,"image width does not divide the number of samples"
-
-    json_update('samples',n_samples)
+   
+    json_update(SAMPLES,n_samples)
            
+    seed_arr = seed(pop)
 
-    seed_arr = np.array(list(range(pop))) + np.random.randint(1,1000000)
     np.random.shuffle(seed_arr)
 
     cpus = multiprocessing.cpu_count()
+
     pool = multiprocessing.Pool(cpus)
 
-    tmp = (n_samples // subpop)
-    tmp2 = n_samples - tmp * subpop 
-    samples_str = " ".join([str(tmp)] * (subpop-1) + [str(tmp + tmp2)])
-
-    sim_path = 'simulation/data'
-    genome_exec = './genome'
-    genome_command = shlex.split("{genome} -s {pop} -pop {n_pop} {samples} -seed".format(genome=genome_exec, pop=pop,n_pop=subpop,samples=samples_str))
-    phenosim_command = "python2 simulation/phenosim/phenosim.py -i G -f {sim_path}/genome{{0}}.txt --outfile {sim_path}/{{0}} --maf_r {maf},1.0 --maf_c {maf} --miss {miss}".format(sim_path=sim_path,maf=maf,miss=miss)
+    genome_command, phenosim_command, samples_str = generate_commands(pop,subpop,n_samples,maf,miss)
 
     if n_snps > 1:
 
@@ -288,19 +429,19 @@ def simulate(pop,subpop,n_samples,n_sim,n_snps,maf,miss,equal,debug):
     
     try:
         if debug:
-            print('mapping using {} cpus'.format(cpus))
-            print('output dir: {}'.format(sim_path))
-            print('genome params: population={pop}, n_pop={n_pop}, samples={samples}'.format(pop=pop,n_pop=subpop,samples=samples_str))
-            print('phenosim params: i= G, maf_c={maf}, maf_r={maf}, miss={miss}'.format(maf=maf,miss=miss))
+            print(f'Mapping using {cpus} CPUs')
+            print(f'Output directory: {SIM_PATH}')
+            print(f'Genome parameters: population={pop}, subpopulations={subpop}, samples={samples_str}')
+            print(f'Phenosim parameters: maf_c={maf}, maf_r={maf}, miss={miss}')
         ss = partial(simulate_helper,genome_command,phenosim_command,seed_arr)
         pool.map(ss,range(n_sim))
     except OSError:
-        if not os.path.exists(genome_exec):
+        if not os.path.exists(GENOME_EXE):
             raise click.ClickException('genome simulator not found') 
     if debug:
-        genome_fcount = len(glob('{}/genome*.txt'.format(sim_path)))
-        emma_fcount = len(glob('{}/*.causal'.format(sim_path)))
-        print('n simulations: expected={0}, genomes={1}, phenotype{2}'.format(n_sim,genome_fcount,emma_fcount))
+        genome_files = glob(f'{SIM_PATH}/genome*.txt')
+        emma_files = glob(f'{SIM_PATH}/*.causal')
+        print(f'n simulations: expected={n_sim}, genomes={len(genome_files)}, phenotype={len(emma_files)}')
 
 @click.group()
 def cli3():
@@ -324,47 +465,26 @@ def train(epochs,n_snps,batch,ratio,width,sim_path,deterministic,debug,cpu):
     from net import Net
     from dataset import DatasetPhenosim
     
-    json_update('width',width)
-    n_samples = json_get('samples')
-    results_path = 'results'
+    json_update(WIDTH,width)
+    n_samples = json_get(SAMPLES)
 
-    if not os.path.exists(results_path):
-        os.mkdir(results_path)
+    if not os.path.exists(RESULTS_PATH):
+        os.mkdir(RESULTS_PATH)
 
     device = 'cpu' if cpu else torch.device("cuda:0" if torch.cuda.is_available() else "cpu")
 
-    generator = torch.Generator()
-
-    if deterministic:
-        torch.manual_seed(0)
-        random.seed(0)
-        np.random.seed(0)
-        generator.manual_seed(0)
-
-        torch.use_deterministic_algorithms(True)
-        os.environ["CUBLAS_WORKSPACE_CONFIG"]=":16:8"
+    generator = configure_deterministic_behavior(deterministic)
 
     full_dataset = DatasetPhenosim(n_samples,n_snps,sim_path)
 
     if debug:
         print(full_dataset.shapes())
-    train_size = int(ratio * len(full_dataset))
-    test_size =  len(full_dataset) - train_size
 
-    train_dataset, test_dataset = torch.utils.data.random_split(full_dataset, [train_size, test_size],generator)
-
-    dataloader_train = DataLoader(train_dataset, batch_size=batch,shuffle=True, num_workers=0)
-    dataloader_test =  DataLoader(test_dataset,  batch_size=batch,shuffle=True, num_workers=0)
-
+    dataloader_train, dataloader_test = split_and_create_dataloaders(full_dataset, ratio, batch, generator)
+    
     net = Net(n_snps,n_samples,batch,width).to(device)
 
-    if debug:
-        print("CUDA verison : {0}".format(torch.version.cuda))
-        print("CUDNN verison : {0}".format(torch.backends.cudnn.version()))
-        print(net)
-        print(device)
-        print("simulated SNP sites: {0}, simulated sample genomes: {1}".format(n_snps,n_samples))
-        print("batch size: {0} , matrix width : {1}".format(batch,width))
+    debug_info(debug,net,device,n_snps,n_samples,batch,width)
 
 
     criterion = nn.MSELoss()
@@ -551,7 +671,7 @@ def train(epochs,n_snps,batch,ratio,width,sim_path,deterministic,debug,cpu):
                     ax[1,1].matshow(avr_TN.cpu())
 
                 fig.canvas.draw()
-                fig.savefig('{results_path}/matrix.png'.format(results_path=results_path,e=e))
+                fig.savefig('{results_path}/matrix.png'.format(results_path=RESULTS_PATH,e=e))
 
      
         else:
@@ -587,7 +707,7 @@ def train(epochs,n_snps,batch,ratio,width,sim_path,deterministic,debug,cpu):
     if debug:
         data = {'TP':TP_arr,'TN':TN_arr,'FP':FP_arr,'FN':FN_arr,'loss':loss_arr}
         df_stats = pd.DataFrame(data)
-        df_stats.to_csv('{results_path}/stats-r{ratio}.csv'.format(results_path=results_path,ratio=n_snps))
+        df_stats.to_csv('{results_path}/stats-r{ratio}.csv'.format(results_path=RESULTS_PATH,ratio=n_snps))
 
 cli = click.CommandCollection(sources=[cli2,cli3,cli1])
 

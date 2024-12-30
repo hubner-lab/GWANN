@@ -1,2 +1,24 @@
-results
-__pycache__
+# Ignore results directory
+results/
+
+# Ignore Python cache files
+__pycache__/
+
+# Ignore args directory
+args/
+
+# Ignore config directories
+config*/
+
+# Ignore log history
+log_history/
+
+# Ignore specific directories
+../GWANN_2/vcf_data/
+vcf_data/
+
+*.sh
+
+.vscode/
+
+genome
