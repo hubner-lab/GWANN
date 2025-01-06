@@ -6,7 +6,12 @@ import resource
 
 class CLIManager:
     def __init__(self):
-        """Initialize the CLI Manager."""
+        """Initialize the CLI Manager.
+        
+        This class is responsible for managing the CLI commands and running the 
+        application. It includes the commands for running, simulating, and training 
+        the model for GWANN analysis.
+        """
         self.cli = click.Group()
 
     @staticmethod
@@ -17,8 +22,28 @@ class CLIManager:
     @click.option('--model','model',default="models/net.pt",help="path to the network model generated in the training step")
     @click.option('--output','output_path',default="results/GWAS",help="prefix of output plot and causative SNPs indexes in the VCF")
     @click.option('--cpu/;','cpu',default=False,required=False,help="force on cpu")
-    def run(vcf, pheno_path, trait, model, output_path, cpu):
-        """Run command for GWANN analysis."""
+    def run(
+        vcf: str,
+        pheno_path:str,
+        trait:str,
+        model:str,
+        output_path:str,
+        cpu:bool
+        )-> None:
+        """Run GWANN analysis.
+
+        This command performs the GWANN analysis using the provided VCF file, phenotype
+        file, trait name, and trained model. It generates output files containing plots
+        and SNP indexes.
+        
+        Args:
+            vcf (str): Path to the VCF file with SNP data.
+            pheno_path (str): Path to the phenotype file (CSV format).
+            trait (str): Name of the trait to analyze.
+            model (str): Path to the trained model.
+            output_path (str): Output file prefix for plots and SNP indexes.
+            cpu (bool): Flag to force CPU usage for computation.
+        """
         Run(vcf, pheno_path, trait, model, output_path, cpu).run()
 
     @staticmethod
@@ -32,7 +57,34 @@ class CLIManager:
     @click.option('--miss', 'miss', default=0.03, type=float, help="Proportion of missing data")
     @click.option('--equal-variance', 'equal', default=False, is_flag=True, help="Set this if equal variance is expected among SNPs (ignore for single SNP)")
     @click.option('--verbose', 'debug', default=False, is_flag=True, help="Increase verbosity")
-    def simulate(pop, subpop, n_samples, n_sim, n_snps, maf, miss, equal, debug):
+    def simulate(
+        pop: int,
+        subpop: int,
+        n_samples: int,
+        n_sim: int, 
+        n_snps: int, 
+        maf: float, 
+        miss: float, 
+        equal: bool, 
+        debug: bool
+        )-> None:
+        """Simulate genetic data for GWANN analysis.
+
+        This command simulates genetic data based on the specified parameters such as 
+        the number of SNPs, subpopulations, individuals, and causal SNPs. The simulation 
+        is performed to generate synthetic data for model training or analysis.
+        
+        Args:
+            pop (int): Number of SNPs in each simulation.
+            subpop (int): Number of subpopulations to simulate.
+            n_samples (int): Number of individuals in the simulation.
+            n_sim (int): Number of simulations to perform.
+            n_snps (int): Number of causal SNPs expected in the simulation.
+            maf (float): Minor allele frequency in the simulated data.
+            miss (float): Proportion of missing data in the simulation.
+            equal (bool): Flag to assume equal variance among SNPs (optional).
+            debug (bool): Flag to enable verbose logging for debugging.
+        """
         Simulate(pop, subpop, n_samples, n_sim, n_snps, maf, miss, equal, debug).simulate()
 
     @staticmethod
@@ -46,13 +98,46 @@ class CLIManager:
     @click.option('--verbose', 'debug', default=False, is_flag=True, help="Increase verbosity")
     @click.option('--deterministic', 'deterministic', default=False, is_flag=True, help="Set for reproducibility")
     @click.option('--cpu', 'cpu', default=False, is_flag=True, help="Force training on CPU")
-    def train(epochs, n_snps, batch, ratio, width, sim_path, debug, deterministic, cpu):
-        """CLI command for training."""
+    def train(
+        epochs: int, 
+        n_snps: int, 
+        batch: int, 
+        ratio: float, 
+        width: int, 
+        sim_path: str, 
+        debug: bool, 
+        deterministic: bool, 
+        cpu: bool
+    ) -> None:
+        """Train the model for GWANN analysis.
+
+        This command trains a model using the provided simulated genetic data. The 
+        model is trained for the specified number of epochs with the given batch size 
+        and training/evaluation split ratio.
+
+        Args:
+            epochs (int): Number of epochs (training iterations).
+            n_snps (int): Number of SNPs to sample per batch.
+            batch (int): Batch size for training.
+            ratio (float): Ratio of training data to evaluation data (train/eval split).
+            width (int): Image width for data processing.
+            sim_path (str): Path to the directory containing the simulated data.
+            debug (bool): Flag to enable verbose logging for debugging.
+            deterministic (bool): Flag to ensure deterministic results for reproducibility.
+            cpu (bool): Flag to force training on CPU.
+        
+        Returns:
+            None: This function does not return any value.
+        """
         Train(epochs, n_snps, batch, ratio, width, sim_path, debug, deterministic, cpu).train()
         
 
     def register_commands(self):
-        """Register CLI commands."""
+        """Register all CLI commands with the main CLI manager.
+
+        This method registers the individual commands (run, simulate, and train) to 
+        the CLI manager, allowing them to be called from the command line interface.
+        """
         self.cli.add_command(self.run)
         self.cli.add_command(self.simulate)
         self.cli.add_command(self.train)

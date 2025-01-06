@@ -93,6 +93,7 @@ class Train:
 
         
         json_update(WIDTH,self.width)
+        
         n_samples = json_get(SAMPLES)
 
         if not os.path.exists(RESULTS_PATH):

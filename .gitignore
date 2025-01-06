@@ -22,3 +22,5 @@ vcf_data/
 .vscode/
 
 genome
+
+logs/
