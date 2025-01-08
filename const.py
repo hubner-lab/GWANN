@@ -9,4 +9,4 @@ UPPER_BOUND = 1000000
 SIM_PATH = 'simulation/data'
 RESULTS_PATH = 'results'
 SIM_GENOM_PATH = SIM_PATH + '/genome'
-GENOME_EXE = './genome'
+GENOME_EXE = '/mnt/data/amir/genome-0.2-Linux/genome-linux-64bit'
