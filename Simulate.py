@@ -57,7 +57,6 @@ class Simulate:
         # Create a pool of worker processes to execute tasks concurrently. Here's a breakdown of what it does:
         pool = multiprocessing.Pool(cpus)
         # TODO: Ask Sariel about the parameters 
-        
         genome_command, phenosim_command, samples_str = self.generate_commands()
 
         try:

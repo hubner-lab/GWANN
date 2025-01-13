@@ -9,7 +9,7 @@ import click
 import matplotlib.pyplot as plt
 import re 
 from net import Net
-
+from const import *
 class Run:
     def __init__(self, vcf:str ,pheno_path:str ,trait:str ,model:str ,output_path:str ,cpu:bool):
         self.vcf = vcf
@@ -27,7 +27,6 @@ class Run:
         #  parse vcf
         #  final_vcf torch.Size([675291, 239])
         #  n_snps 675291 ==> why it always the same out-put is it because the number of snps in the vcf? 
-        #
         width = json_get('width')
         n_samples = json_get('samples')
 
@@ -51,7 +50,7 @@ class Run:
         tmp_vcf[np.where(tmp_vcf == 0.5)] = 0 
         #print(tmp_vcf.shape)
 
-        device = 'cpu' if self.cpu else torch.device("cuda:0" if torch.cuda.is_available() else "cpu")
+        device = CPU if self.cpu else torch.device(CUDA if torch.cuda.is_available() else CPU)
         final_vcf = torch.from_numpy(tmp_vcf).float()  # .to(device)
 
         embedding = MDS(n_components=1,random_state=0)

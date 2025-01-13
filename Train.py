@@ -59,7 +59,7 @@ class Train:
         return dataloader_train, dataloader_test
 
 
-    def __configure_deterministic_behavior(self) -> torch.Generator:
+    def __configure_deterministic_behavior(self) -> None:
         """
         Configures deterministic behavior for PyTorch, NumPy, and Python's random module.
 
@@ -69,18 +69,18 @@ class Train:
         Returns:
             torch.Generator: A PyTorch random number generator with the specified seed (if deterministic).
         """
-        generator = torch.Generator()
+        self.generator = torch.Generator()
 
         if self.deterministic:
             # Set seeds for reproducibility
             torch.manual_seed(SEED)
             random.seed(SEED)
             np.random.seed(SEED)
-            generator.manual_seed(SEED)
+            self.generator.manual_seed(SEED)
             # Configure PyTorch for deterministic algorithms
             torch.use_deterministic_algorithms(MODE)
             os.environ["CUBLAS_WORKSPACE_CONFIG"] = CUBLAS_WORKSPACE_CONFIG
-        return generator
+        
     
     def set_criterion(self)->None:
         return nn.MSELoss(),  F.mse_loss
@@ -97,7 +97,7 @@ class Train:
 
         self.device = CPU if self.cpu else torch.device(CUDA if torch.cuda.is_available() else CPU)
 
-        self.generator = self.__configure_deterministic_behavior()
+        self.__configure_deterministic_behavior()
 
         self.full_dataset = DatasetPhenosim(self.n_samples,self.n_snps,self.sim_path)
 
@@ -108,7 +108,7 @@ class Train:
         
         self.net = Net(self.n_snps,self.n_samples,self.batch,self.width).to(self.device)
 
-        self.__debug_info(self.n_samples,self.net,self.device)
+        self.__debug_info()
 
         self.criterion, self.criterion_test = self.set_criterion()
                                                             
@@ -144,7 +144,7 @@ class Train:
         self.TP_arr = torch.zeros(self.epochs, dtype=torch.int32)
         self.TN_arr = torch.zeros(self.epochs, dtype=torch.int32)
 
-    def __update_avg_metrics(self):
+    def __update_avg_metrics(self) -> Tuple[torch.Tensor, torch.Tensor, torch.Tensor, torch.Tensor]:
         """
         Initializes and returns a tuple of four tensors for average metrics (FN, FP, TN, TP).
 
@@ -152,7 +152,7 @@ class Train:
             Tuple[torch.Tensor, torch.Tensor, torch.Tensor, torch.Tensor]: 
             A tuple containing initialized tensors for FN, FP, TN, and TP.
         """
-        return tuple(torch.zeros((self.width, self.n_samples // self.width)).to(self.device) for _ in range(4))
+        return tuple(torch.zeros((self.width, self.n_samples // self.width)).to(self.device) for _ in range(TOTAL_METRICS))
 
     def __reset_metrics(self):
         """
@@ -163,28 +163,76 @@ class Train:
             A tuple containing initial values for total_loss, times, n_FN, n_FP, n_TP, and n_TN.
         """
         return 0.0, 0, 0, 0, 0, 0
+
+    def _prepare_batch(self, data):
+        return (data[INPUT].float().to(self.device), 
+                data[OUTPUT].float().to(self.device), 
+                data[POPULATION].float().to(self.device))
+    
+    def _plot1(self):
+        """
+        Initializes and returns a matplotlib figure and axes for plotting average matrices.
+
+        This function creates a 2x2 subplot grid with labels for False Positives, 
+        False Negatives, True Positives, and True Negatives. It is used for visualizing 
+        the average metrics during training if the `PLOT_AVERAGE` flag is enabled.
+
+        Returns:
+            tuple: A tuple containing:
+                - fig (matplotlib.figure.Figure): The matplotlib figure object.
+                - ax (numpy.ndarray): A 2D array of AxesSubplot objects for the 2x2 grid.
+        """
         
+        fig, ax = plt.subplots(PLOT_SIZE, PLOT_SIZE)
+        ax[0, 0].set_xlabel("False Positives")
+        ax[0, 1].set_xlabel("False Negatives")
+        ax[1, 0].set_xlabel("True Positives")
+        ax[1, 1].set_xlabel("True Negatives")
+        return fig, ax
+        
+    def _plot_average_matrices(self, e, fig, ax, avr_FP, avr_FN, avr_TP, avr_TN, n_FP, n_FN, n_TP, n_TN):
+        """
+        Plots and saves average matrices for False Positives, False Negatives, 
+        True Positives, and True Negatives during training.
+
+        Parameters:
+            e (int): Current epoch number.
+            fig (matplotlib.figure.Figure): Figure object for plotting.
+            ax (numpy.ndarray): Array of AxesSubplot objects for plotting matrices.
+            avr_FP, avr_FN, avr_TP, avr_TN (torch.Tensor): Tensors for average metrics.
+            n_FP, n_FN, n_TP, n_TN (int): Counters for each metric.
+            results_path (str): Path to save the output plot.
+        """
+
+        # Clear axes
+        ax[0, 0].clear()
+        ax[0, 1].clear()
+        ax[1, 0].clear()
+        ax[1, 1].clear()
+        # Plot matrices if there are any values
+        if n_FP > 0:
+            ax[0, 0].matshow(avr_FP.cpu())
+        if n_FN > 0:
+            ax[0, 1].matshow(avr_FN.cpu())
+        if n_TP > 0:
+            ax[1, 0].matshow(avr_TP.cpu())
+        if n_TN > 0:
+            ax[1, 1].matshow(avr_TN.cpu())
+        # Update and save the figure
+        fig.canvas.draw()
+        fig.savefig(f'{RESULTS_PATH}/matrix_{e}.png')
+
     def train(self):
         """Train the model on the simulated data"""
-
         self.__init_data_for_training()
 
-        min_loss = np.Infinity
-
-        max_accuracy = 0
+        min_loss,max_accuracy = np.Infinity, 0
 
         if not Path(MODELS_DIR).is_dir():
             Path(MODELS_DIR).mkdir(parents=True,exist_ok=True)
 
-
-
         if PLOT_AVERAGE:
-            fig,ax = plt.subplots(2,2)
-
-            ax[0,0].set_xlabel("False Positives")
-            ax[0,1].set_xlabel("False Negatives")
-            ax[1,0].set_xlabel("True Positives")
-            ax[1,1].set_xlabel("True Negatives")
+            fig,ax = self._plot1()
 
         self.__init_initialize_metrics()
 
@@ -201,9 +249,7 @@ class Train:
             with torch.no_grad():
                 for i,data in enumerate(self.dataloader_test):
 
-                    inputs = data['input'].float().to(self.device)
-                    pred = data['output'].float().to(self.device)
-                    pop = data['population'].float().to(self.device)
+                    inputs, pred, pop = self._prepare_batch(data)
 
                     outputs = self.net(inputs,pop)
 
@@ -315,24 +361,7 @@ class Train:
                     }, "models/net-accuracy.pt")
 
                 if PLOT_AVERAGE and e % 20 == 0:
-                    ax[0,0].clear()
-                    ax[0,1].clear()
-                    ax[1,0].clear()
-                    ax[1,1].clear()
-
-                    if n_FP > 0:
-                        ax[0,0].matshow(avr_FP.cpu())
-                    if n_FN > 0:
-                        ax[0,1].matshow(avr_FN.cpu())
-                    if n_TP > 0:
-                        ax[1,0].matshow(avr_TP.cpu())
-                    if n_TN > 0:
-                        ax[1,1].matshow(avr_TN.cpu())
-
-                    fig.canvas.draw()
-                    fig.savefig('{results_path}/matrix.png'.format(results_path=RESULTS_PATH,e=e))
-
-        
+                    self._plot_average_matrices(e, fig, ax, avr_FP, avr_FN, avr_TP, avr_TN, n_FP, n_FN, n_TP, n_TN)
             else:
                 print("Epoch: {0}".format(e))
 
@@ -345,6 +374,7 @@ class Train:
         
             self.full_dataset.train()
             self.net.train()
+
             for i,data in enumerate(self.dataloader_train):
                 self.optimizer.zero_grad()
 
@@ -374,15 +404,6 @@ class Train:
         """
         Print debugging information if debugging is enabled.
 
-        Parameters:
-            debug (bool): Whether to enable debug printing.
-            torch (torch): The PyTorch module for accessing version info.
-            net (torch.nn.Module): The neural network model.
-            device (torch.device): The device being used (CPU/GPU).
-            n_snps (int): Number of simulated SNP sites.
-            n_samples (int): Number of simulated sample genomes.
-            batch (int): Batch size.
-            width (int): Matrix width.
         """
         if self.debug:
             print("CUDA version : {0}".format(torch.version.cuda))
