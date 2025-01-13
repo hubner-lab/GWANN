@@ -1,6 +1,6 @@
 from typing import Tuple, Optional
 from utilities import json_update, json_get
-from const import WIDTH, SAMPLES, RESULTS_PATH
+from const import*
 import os 
 import torch 
 import torch.nn as nn
@@ -26,10 +26,7 @@ class Train:
         self.debug = debug
         self.cpu = cpu
 
-    def split_and_create_dataloaders(self,
-            full_dataset: Dataset, 
-            generator: torch.Generator
-                                    ) -> Tuple[DataLoader, DataLoader]:
+    def __split_and_create_dataloaders(self) -> Tuple[DataLoader, DataLoader]:
         """
             Splits a dataset into training and testing datasets and creates corresponding DataLoaders.
 
@@ -43,12 +40,12 @@ class Train:
                 Tuple[DataLoader, DataLoader]: The training and testing DataLoaders.
         """
         # Calculate the sizes of the train and test datasets
-        train_size = int(self.ratio * len(full_dataset))
-        test_size = len(full_dataset) - train_size
+        train_size = int(self.ratio * len(self.full_dataset))
+        test_size = len(self.full_dataset) - train_size
 
         # Split the dataset into train and test datasets
         train_dataset, test_dataset = torch.utils.data.random_split(
-            full_dataset, [train_size, test_size], generator
+            self.full_dataset, [train_size, test_size], self.generator
         )
 
         # Create DataLoaders for the train and test datasets
@@ -62,13 +59,12 @@ class Train:
         return dataloader_train, dataloader_test
 
 
-    def configure_deterministic_behavior(self, seed: Optional[int] = 0) -> torch.Generator:
+    def __configure_deterministic_behavior(self) -> torch.Generator:
         """
         Configures deterministic behavior for PyTorch, NumPy, and Python's random module.
 
-        Parameters:
-            deterministic (bool): Whether to enable deterministic behavior.
-            seed (Optional[int]): The seed value to use for random number generators. Defaults to 0.
+        MODE=True (bool): Whether to enable deterministic behavior.
+        SEED=0 (Optional[int]): The seed value to use for random number generators.
 
         Returns:
             torch.Generator: A PyTorch random number generator with the specified seed (if deterministic).
@@ -77,62 +73,112 @@ class Train:
 
         if self.deterministic:
             # Set seeds for reproducibility
-            torch.manual_seed(seed)
-            random.seed(seed)
-            np.random.seed(seed)
-            generator.manual_seed(seed)
-
+            torch.manual_seed(SEED)
+            random.seed(SEED)
+            np.random.seed(SEED)
+            generator.manual_seed(SEED)
             # Configure PyTorch for deterministic algorithms
-            torch.use_deterministic_algorithms(True)
-            os.environ["CUBLAS_WORKSPACE_CONFIG"] = ":16:8"
-
+            torch.use_deterministic_algorithms(MODE)
+            os.environ["CUBLAS_WORKSPACE_CONFIG"] = CUBLAS_WORKSPACE_CONFIG
         return generator
+    
+    def set_criterion(self)->None:
+        return nn.MSELoss(),  F.mse_loss
+    
 
-    def train(self):
-        """Train the model on the simulated data"""
-
-        
+    def __init_data_for_training(self)->None:
+             
         json_update(WIDTH,self.width)
         
-        n_samples = json_get(SAMPLES)
+        self.n_samples = json_get(SAMPLES)
 
         if not os.path.exists(RESULTS_PATH):
             os.mkdir(RESULTS_PATH)
 
-        device = 'cpu' if self.cpu else torch.device("cuda:0" if torch.cuda.is_available() else "cpu")
+        self.device = CPU if self.cpu else torch.device(CUDA if torch.cuda.is_available() else CPU)
 
-        generator = self.configure_deterministic_behavior()
+        self.generator = self.__configure_deterministic_behavior()
 
-        full_dataset = DatasetPhenosim(n_samples,self.n_snps,self.sim_path)
+        self.full_dataset = DatasetPhenosim(self.n_samples,self.n_snps,self.sim_path)
 
         if self.debug:
-            print(full_dataset.shapes())
+            print(self.full_dataset.shapes())
 
-        dataloader_train, dataloader_test = self.split_and_create_dataloaders(full_dataset, generator)
+        self.dataloader_train, self.dataloader_test = self.__split_and_create_dataloaders()
         
-        net = Net(self.n_snps,n_samples,self.batch,self.width).to(device)
+        self.net = Net(self.n_snps,self.n_samples,self.batch,self.width).to(self.device)
 
-        self.debug_info(n_samples,net,device)
+        self.__debug_info(self.n_samples,self.net,self.device)
+
+        self.criterion, self.criterion_test = self.set_criterion()
+                                                            
+        self.optimizer = optim.SGD(self.net.parameters(), lr=LR,momentum=MOMENTUM,weight_decay=WEIGHT_DECAY)
+
+        self.scheduler = optim.lr_scheduler.ExponentialLR(self.optimizer,gamma=GAMMA)
 
 
-        criterion = nn.MSELoss()
-        criterion_test = F.mse_loss
+    def __init_initialize_metrics(self)-> None:
+        """
+        Initializes metric arrays for tracking performance during training or evaluation.
 
-        optimizer = optim.SGD(net.parameters(), lr=1e-2,momentum=0.9,weight_decay=1e-5)
-        scheduler = optim.lr_scheduler.ExponentialLR(optimizer,gamma=0.8)
+        This method creates the following arrays as attributes of the class:
+        - `self.loss_arr`: A tensor to store loss values for each epoch.
+        - `self.FP_arr`: A tensor to store the count of False Positives (FP) for each epoch.
+        - `self.FN_arr`: A tensor to store the count of False Negatives (FN) for each epoch.
+        - `self.TP_arr`: A tensor to store the count of True Positives (TP) for each epoch.
+        - `self.TN_arr`: A tensor to store the count of True Negatives (TN) for each epoch.
+
+        Attributes:
+            loss_arr (torch.Tensor): Zero-initialized tensor for loss values.
+            FP_arr (torch.Tensor): Zero-initialized tensor for False Positives.
+            FN_arr (torch.Tensor): Zero-initialized tensor for False Negatives.
+            TP_arr (torch.Tensor): Zero-initialized tensor for True Positives.
+            TN_arr (torch.Tensor): Zero-initialized tensor for True Negatives.
+
+        Returns:
+            None
+        """
+        self.loss_arr = torch.zeros(self.epochs)
+        self.FP_arr = torch.zeros(self.epochs, dtype=torch.int32)
+        self.FN_arr = torch.zeros(self.epochs, dtype=torch.int32)
+        self.TP_arr = torch.zeros(self.epochs, dtype=torch.int32)
+        self.TN_arr = torch.zeros(self.epochs, dtype=torch.int32)
+
+    def __update_avg_metrics(self):
+        """
+        Initializes and returns a tuple of four tensors for average metrics (FN, FP, TN, TP).
+
+        Returns:
+            Tuple[torch.Tensor, torch.Tensor, torch.Tensor, torch.Tensor]: 
+            A tuple containing initialized tensors for FN, FP, TN, and TP.
+        """
+        return tuple(torch.zeros((self.width, self.n_samples // self.width)).to(self.device) for _ in range(4))
+
+    def __reset_metrics(self):
+        """
+        Resets tracking variables for loss and metrics to their initial values.
+
+        Returns:
+            Tuple[float, int, int, int, int, int]: 
+            A tuple containing initial values for total_loss, times, n_FN, n_FP, n_TP, and n_TN.
+        """
+        return 0.0, 0, 0, 0, 0, 0
+        
+    def train(self):
+        """Train the model on the simulated data"""
+
+        self.__init_data_for_training()
 
         min_loss = np.Infinity
+
         max_accuracy = 0
-        
-        if not Path("models").is_dir():
-            Path("models").mkdir(parents=True,exist_ok=True)
 
-        clip_grad_norm = 5 
-        e = 0
+        if not Path(MODELS_DIR).is_dir():
+            Path(MODELS_DIR).mkdir(parents=True,exist_ok=True)
 
-        plot_average = False 
 
-        if plot_average:
+
+        if PLOT_AVERAGE:
             fig,ax = plt.subplots(2,2)
 
             ax[0,0].set_xlabel("False Positives")
@@ -140,43 +186,28 @@ class Train:
             ax[1,0].set_xlabel("True Positives")
             ax[1,1].set_xlabel("True Negatives")
 
-        loss_arr = torch.zeros(self.epochs)
-
-        FP_arr = torch.zeros(self.epochs,dtype=int)
-        FN_arr = torch.zeros(self.epochs,dtype=int)
-        TP_arr = torch.zeros(self.epochs,dtype=int)
-        TN_arr = torch.zeros(self.epochs,dtype=int)
-
+        self.__init_initialize_metrics()
 
         for e in range(self.epochs):
-            total_loss = 0
-            times = 0
 
-            n_FN = 0
-            n_FP = 0
-            n_TP = 0
-            n_TN = 0
-        
-            avr_FN = torch.zeros((self.width,n_samples // self.width)).to(device)
-            avr_FP = torch.zeros((self.width,n_samples // self.width)).to(device)
-            avr_TN = torch.zeros((self.width,n_samples // self.width)).to(device)
-            avr_TP = torch.zeros((self.width,n_samples // self.width)).to(device)
-        
+            total_loss, times, n_FN, n_FP, n_TP, n_TN = self.__reset_metrics()
 
-            net.eval()
+            avr_FN, avr_FP, avr_TN, avr_TP = self.__update_avg_metrics()
+    
+            self.net.eval()
             # if debug:
                 # full_dataset.eval_()
 
             with torch.no_grad():
-                for i,data in enumerate(dataloader_test):
+                for i,data in enumerate(self.dataloader_test):
 
-                    inputs = data['input'].float().to(device)
-                    pred = data['output'].float().to(device)
-                    pop = data['population'].float().to(device)
+                    inputs = data['input'].float().to(self.device)
+                    pred = data['output'].float().to(self.device)
+                    pop = data['population'].float().to(self.device)
 
-                    outputs = net(inputs,pop)
+                    outputs = self.net(inputs,pop)
 
-                    loss = criterion_test(outputs,pred)
+                    loss = self.criterion_test(outputs,pred)
                     total_loss += loss.item()
                     times += 1
 
@@ -193,7 +224,7 @@ class Train:
 
                         pop_copy = pop.detach().clone() 
 
-                        pop_copy = pop_copy.view(tmp_batch,n_samples)
+                        pop_copy = pop_copy.view(tmp_batch,self.n_samples)
                         pop_copy = pop_copy.view(tmp_batch,self.width,-1)
                         pop_copy = torch.unsqueeze(pop_copy,1)
 
@@ -215,10 +246,10 @@ class Train:
                         pred_ind_tmp_2 = (pred_copy < min).nonzero()
 
                         if self.deterministic: # cuda problem when CUBLAS_WORKSPACE_CONFIG=":16:8"
-                            outputs_copy[ind_tmp] = torch.ones(outputs_copy[ind_tmp].shape).to(device)  
-                            outputs_copy[ind_tmp_2] = - torch.ones(outputs_copy[ind_tmp_2].shape).to(device) 
-                            pred_copy[pred_ind_tmp] = torch.ones(pred_copy[pred_ind_tmp].shape).to(device)  
-                            pred_copy[pred_ind_tmp_2] = -torch.ones(pred_copy[pred_ind_tmp_2].shape).to(device) 
+                            outputs_copy[ind_tmp] = torch.ones(outputs_copy[ind_tmp].shape).to(self.device)  
+                            outputs_copy[ind_tmp_2] = - torch.ones(outputs_copy[ind_tmp_2].shape).to(self.device) 
+                            pred_copy[pred_ind_tmp] = torch.ones(pred_copy[pred_ind_tmp].shape).to(self.device)  
+                            pred_copy[pred_ind_tmp_2] = -torch.ones(pred_copy[pred_ind_tmp_2].shape).to(self.device) 
                         else:
                             outputs_copy[ind_tmp] = 1.
                             outputs_copy[ind_tmp_2] = -1.
@@ -254,12 +285,12 @@ class Train:
 
             if self.debug:
 
-                loss_arr[e] = total_loss / times
+                self.loss_arr[e] = total_loss / times
 
-                TP_arr[e] = n_TP
-                FP_arr[e] = n_FP
-                TN_arr[e] = n_TN
-                FN_arr[e] = n_FN
+                self.TP_arr[e] = n_TP
+                self.FP_arr[e] = n_FP
+                self.TN_arr[e] = n_TN
+                self.FN_arr[e] = n_FN
 
                 # print("FP: {0}, FN : {1}, TP: {2}, TN: {3}".format(n_FP,n_FN,n_TP,n_TN))
                 accuracy = 100.0*(n_TP+n_TN)/(n_FP+n_FN+n_TN+n_TP)
@@ -272,18 +303,18 @@ class Train:
                     recall,
                     precision,
                     F1,
-                    loss_arr[e] 
+                    self.loss_arr[e] 
                 ))
 
 
                 if max_accuracy < accuracy:
                     accuracy = max_accuracy
                     torch.save({
-                        'model_state_dict': net.state_dict(),
-                        'optimizer_state_dict': optimizer.state_dict(),
+                        'model_state_dict': self.net.state_dict(),
+                        'optimizer_state_dict': self.optimizer.state_dict(),
                     }, "models/net-accuracy.pt")
 
-                if plot_average and e % 20 == 0:
+                if PLOT_AVERAGE and e % 20 == 0:
                     ax[0,0].clear()
                     ax[0,1].clear()
                     ax[1,0].clear()
@@ -308,40 +339,37 @@ class Train:
             if total_loss/times < min_loss:
                 min_loss  = total_loss/times
                 torch.save({
-                    'model_state_dict': net.state_dict(),
-                    'optimizer_state_dict': optimizer.state_dict(),
+                    'model_state_dict': self.net.state_dict(),
+                    'optimizer_state_dict': self.optimizer.state_dict(),
                 }, "models/net.pt")
         
-            full_dataset.train()
-            net.train()
-            for i,data in enumerate(dataloader_train):
-                optimizer.zero_grad()
+            self.full_dataset.train()
+            self.net.train()
+            for i,data in enumerate(self.dataloader_train):
+                self.optimizer.zero_grad()
 
-                inputs = data['input'].float().to(device)
-                pred = data['output'].float().to(device)
-                pop = data['population'].float().to(device)
+                inputs = data['input'].float().to(self.device)
+                pred = data['output'].float().to(self.device)
+                pop = data['population'].float().to(self.device)
 
-                outputs = net(inputs,pop)
+                outputs = self.net(inputs,pop)
                 
-                loss = criterion(outputs, pred)
+                loss = self.criterion(outputs, pred)
                 loss.backward()
-                torch.nn.utils.clip_grad_norm_(net.parameters(), clip_grad_norm)
-                optimizer.step()    
+                torch.nn.utils.clip_grad_norm_(self.net.parameters(), CLIP_GRAD_NOEM)
+                self.optimizer.step()    
 
             if e % 100 == 0:
-                scheduler.step()
+                self.scheduler.step()
 
 
         if self.debug:
-            data = {'TP':TP_arr,'TN':TN_arr,'FP':FP_arr,'FN':FN_arr,'loss':loss_arr}
+            data = {'TP':self.TP_arr,'TN':self.TN_arr,'FP':self.FP_arr,'FN':self.FN_arr,'loss':self.loss_arr}
             df_stats = pd.DataFrame(data)
             df_stats.to_csv('{results_path}/stats-r{ratio}.csv'.format(results_path=RESULTS_PATH,ratio=self.n_snps))
 
             
-    def debug_info(self,
-        n_samples: int,
-        net: torch.nn.Module, 
-        device: torch.device, 
+    def __debug_info(self, 
                 ) -> None:
         """
         Print debugging information if debugging is enabled.
@@ -359,9 +387,9 @@ class Train:
         if self.debug:
             print("CUDA version : {0}".format(torch.version.cuda))
             print("CUDNN version : {0}".format(torch.backends.cudnn.version()))
-            print(net)
-            print(device)
-            print("Simulated SNP sites: {0}, Simulated sample genomes: {1}".format(self.n_snps, n_samples))
+            print(self.net)
+            print(self.device)
+            print("Simulated SNP sites: {0}, Simulated sample genomes: {1}".format(self.n_snps, self.n_samples))
             print("Batch size: {0}, Matrix width: {1}".format(self.batch, self.width))
 
 

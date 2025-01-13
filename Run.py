@@ -22,7 +22,12 @@ class Run:
 
     def run(self):
         """Run on real data"""
-
+        # TODO: save vcf
+        #  reload vcf
+        #  parse vcf
+        #  final_vcf torch.Size([675291, 239])
+        #  n_snps 675291 ==> why it always the same out-put is it because the number of snps in the vcf? 
+        #
         width = json_get('width')
         n_samples = json_get('samples')
 

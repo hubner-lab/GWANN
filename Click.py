@@ -76,13 +76,13 @@ class CLIManager:
         
         Args:
             pop (int): Number of SNPs in each simulation.
-            subpop (int): Number of subpopulations to simulate.
-            n_samples (int): Number of individuals in the simulation.
-            n_sim (int): Number of simulations to perform.
-            n_snps (int): Number of causal SNPs expected in the simulation.
-            maf (float): Minor allele frequency in the simulated data.
-            miss (float): Proportion of missing data in the simulation.
-            equal (bool): Flag to assume equal variance among SNPs (optional).
+            subpop (int): Number of expected subpopulations.
+            n_samples (int): Number of individuals.
+            n_sim (int): Number of populations to be simulated.
+            n_snps (int): Number of causal SNPs expected per number of SNP-sites.
+            maf (float): Minor allele frequency.
+            miss (float): Proportion of missing data.
+            equal (bool): Set this if equal variance is expected among SNPs (ignore for single SNP)
             debug (bool): Flag to enable verbose logging for debugging.
         """
         Simulate(pop, subpop, n_samples, n_sim, n_snps, maf, miss, equal, debug).simulate()

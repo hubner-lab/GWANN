@@ -1,12 +1,24 @@
 from pathlib import Path
 
-SAMPLES = 'samples'
+SAMPLES = "samples"
 WIDTH = 'width'
 JSON_FILE = Path("data.json")
 current_dict = None 
 LOWER_BOUND = 1
 UPPER_BOUND = 1000000
-SIM_PATH = 'simulation/data'
-RESULTS_PATH = 'results'
-SIM_GENOM_PATH = SIM_PATH + '/genome'
-GENOME_EXE = '/mnt/data/amir/genome-0.2-Linux/genome-linux-64bit'
+SIM_PATH = "simulation/data"
+RESULTS_PATH = "results"
+SIM_GENOM_PATH = SIM_PATH + "/genome"
+GENOME_EXE = "/mnt/data/amir/genome-0.2-Linux/genome-linux-64bit"
+MODE = True
+CUBLAS_WORKSPACE_CONFIG = ":16:8"
+CPU = "cpu"
+CUDA = "cuda:0" 
+SEED = 0
+PLOT_AVERAGE = False 
+MOMENTUM = 0.9
+LR = 1e-2  # learning rate 
+WEIGHT_DECAY = 1e-5
+MODELS_DIR = "models"
+CLIP_GRAD_NOEM = 5 
+GAMMA= 0.8

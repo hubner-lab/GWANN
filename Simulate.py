@@ -20,15 +20,15 @@ class Simulate:
         Initialize the simulation parameters.
 
         Args:
-            pop (int): Number of SNPs.
-            subpop (str): Subpopulation identifier.
-            n_samples (int): Number of samples to simulate.
-            n_sim (int): Number of simulations to run.
-            n_snps (int): Number of SNPs (Single Nucleotide Polymorphisms) to simulate.
-            maf (float): Minor Allele Frequency threshold.
-            miss (float): Missing data rate.
-            equal (bool): Flag to indicate if equal sampling is required.
-            debug (bool): Flag to enable debug mode.
+            pop (int): Number of SNPs in each simulation.
+            subpop (int): Number of expected subpopulations.
+            n_samples (int): Number of individuals.
+            n_sim (int): Number of populations to be simulated.
+            n_snps (int): Number of causal SNPs expected per number of SNP-sites.
+            maf (float): Minor allele frequency.
+            miss (float): Proportion of missing data.
+            equal (bool): Set this if equal variance is expected among SNPs (ignore for single SNP)
+            debug (bool): Flag to enable verbose logging for debugging.
         """
         self.pop = pop
         self.subpop = subpop
@@ -56,7 +56,8 @@ class Simulate:
         cpus = multiprocessing.cpu_count()
         # Create a pool of worker processes to execute tasks concurrently. Here's a breakdown of what it does:
         pool = multiprocessing.Pool(cpus)
-
+        # TODO: Ask Sariel about the parameters 
+        
         genome_command, phenosim_command, samples_str = self.generate_commands()
 
         try:
@@ -167,6 +168,7 @@ class Simulate:
             print(f'Output directory: {SIM_PATH}')
             print(f'Genome parameters: population={self.pop}, subpopulations={self.subpop}, samples={samples_str}')
             print(f'Phenosim parameters: maf_c={self.maf}, maf_r={self.maf}, miss={self.miss}')
+
     def debug_message2(self):
         if self.debug:
             genome_files = glob(f'{SIM_PATH}/genome*.txt')

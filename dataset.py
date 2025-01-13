@@ -120,7 +120,8 @@ class DatasetPhenosim(Dataset):
         embedding = MDS(n_components=1,random_state=0)
         mds_data = embedding.fit_transform(data_input.T).T
         
-        # TODO: check if this is correct with Sariel 
+        # TODO: Ask Sariel what is the connection between -S in the simulation and the -S in the training, it seems if -S in simulation bigger than -S in training 
+        # n here will be negative 
         n = self.SNP - len(causal_SNP)  
         
         indexes = np.random.choice(np.setdiff1d(range(data_input.shape[0]),causal_SNP), n, replace=False)  
