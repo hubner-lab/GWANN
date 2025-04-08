@@ -1,5 +1,6 @@
 from pathlib import Path
 
+SIMULATIONS = "simulations"
 SAMPLES = "samples"
 WIDTH = 'width'
 JSON_FILE = Path("data.json")
@@ -9,7 +10,8 @@ UPPER_BOUND = 1000000
 SIM_PATH = "simulation/data"
 RESULTS_PATH = "results"
 SIM_GENOM_PATH = SIM_PATH + "/genome"
-GENOME_EXE = "/mnt/data/amir/genome-0.2-Linux/genome-linux-64bit"
+USER="amir"
+GENOME_EXE = f'/mnt/data/{USER}/GWANN_PROJECT/genome-0.2-Linux/genome'
 MODE = True
 CUBLAS_WORKSPACE_CONFIG = ":16:8"
 CPU = "cpu"
@@ -20,10 +22,15 @@ MOMENTUM = 0.9
 LR = 1e-2  # learning rate 
 WEIGHT_DECAY = 1e-5
 MODELS_DIR = "models"
-CLIP_GRAD_NOEM = 5 
+CLIP_GRAD_NORM = 5 
 GAMMA= 0.8
 TOTAL_METRICS = 4
 INPUT = 'input'
 OUTPUT = 'output'
 POPULATION = 'population'
 PLOT_SIZE = 2
+MODEL_PATH_ACCURACY = "models/net-accuracy.pt"
+MODEL_PATH_MIN_LOSS = "models/net.pt"
+MODEL_PATH_TENSOR = 'models/trained_model.h5'
+LOGGER_DIR = 'logs'
+LOGGER_FILE ='logger'

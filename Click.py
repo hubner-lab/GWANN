@@ -1,9 +1,14 @@
 import click
 from Simulate import Simulate
-from Train import Train
-from Run import Run
+from train import Train
+from run import Run
+from utilities import json_get
 import resource
-
+from const import SIMULATIONS, LOGGER_DIR, LOGGER_FILE
+import datetime
+from mylogger import Logger
+import os
+os.environ['LOGGER'] = f'{LOGGER_DIR}/{LOGGER_FILE}_{datetime.datetime.now().strftime("%Y-%m-%d_%H-%M-%S")}.log'
 class CLIManager:
     def __init__(self):
         """Initialize the CLI Manager.
@@ -44,7 +49,9 @@ class CLIManager:
             output_path (str): Output file prefix for plots and SNP indexes.
             cpu (bool): Flag to force CPU usage for computation.
         """
-        Run(vcf, pheno_path, trait, model, output_path, cpu).run()
+        Logger(f'Message:', os.environ['LOGGER']).debug(f"Running GWANN analysis with VCF: {vcf}, phenotype path: {pheno_path}, trait: {trait}, model: {model}, output path: {output_path}")
+        Run(vcf, pheno_path, trait, model, output_path, cpu).start()
+        pass
 
     @staticmethod
     @click.command()
@@ -57,6 +64,7 @@ class CLIManager:
     @click.option('--miss', 'miss', default=0.03, type=float, help="Proportion of missing data")
     @click.option('--equal-variance', 'equal', default=False, is_flag=True, help="Set this if equal variance is expected among SNPs (ignore for single SNP)")
     @click.option('--verbose', 'debug', default=False, is_flag=True, help="Increase verbosity")
+    @click.option('--delete', 'delete', default=True, is_flag=True, help="Delete the current simulated files")
     def simulate(
         pop: int,
         subpop: int,
@@ -66,7 +74,8 @@ class CLIManager:
         maf: float, 
         miss: float, 
         equal: bool, 
-        debug: bool
+        debug: bool,
+        delete: bool
         )-> None:
         """Simulate genetic data for GWANN analysis.
 
@@ -85,7 +94,8 @@ class CLIManager:
             equal (bool): Set this if equal variance is expected among SNPs (ignore for single SNP)
             debug (bool): Flag to enable verbose logging for debugging.
         """
-        Simulate(pop, subpop, n_samples, n_sim, n_snps, maf, miss, equal, debug).simulate()
+        Logger(f'Message:', os.environ['LOGGER']).debug(f"Simulating {n_sim} populations with {pop} SNPs, {subpop} subpopulations, {n_samples} samples, {n_snps} causal SNPs, MAF: {maf}, missing data: {miss}, equal variance: {equal}")
+        Simulate(pop, subpop, n_samples, n_sim, n_snps, maf, miss, equal, debug, delete).simulate()
 
     @staticmethod
     @click.command()
@@ -129,7 +139,9 @@ class CLIManager:
         Returns:
             None: This function does not return any value.
         """
-        Train(epochs, n_snps, batch, ratio, width, sim_path, debug, deterministic, cpu).train()
+        Logger(f'Message:', os.environ['LOGGER']).debug(f"Training with {epochs} epochs, {n_snps} sampled SNPs, batch size {batch}, ratio {ratio}, width {width}, path {sim_path}")
+        total_simulations = json_get(SIMULATIONS)
+        Train(total_simulations, n_snps, width, batch, epochs, sim_path, ratio ).run()
         
 
     def register_commands(self):

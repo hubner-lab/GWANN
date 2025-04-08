@@ -1,147 +1,47 @@
-import torch
-import torch.nn as nn
-import torch.nn.functional as F 
-import torch.optim as optim
-from torch.utils.data import Dataset, DataLoader
-import torch.autograd.profiler as profiler
-import torch.nn.utils.prune as prune
-import torchvision
-import torchvision.transforms as T
-import click
-import numpy as np
-import pandas as pd
+from simulationloader import SimulationDataReader
+from genomeToImage import GenomeImage
+import tensorflow as tf
+import sys 
+from mylogger import Logger
+import os 
+class Dataset:
+    BASEPATH = './simulation/data/'
 
-from sklearn.manifold import MDS
+    def __init__(self, total_simulations: int, causalSamples: int, columns: int, simPath: str = None):
+        self.total_simulations = total_simulations
+        self.causalSamples = causalSamples # causal samples not individuals 
+        self.columns = columns
+        self.X_list = []  # Use a Python list to collect tensors
+        self.y_list = []
+        self.simPath = simPath if simPath else self.BASEPATH
+    def load_data(self):        
+        for simIndex in range(self.total_simulations):
+            simData = SimulationDataReader(self.simPath).run(simIndex, self.causalSamples)
+            self.createImages(simData)
+            percent = int(((simIndex + 1) / self.total_simulations) * 100)
+            sys.stdout.write(f'\rLoading simulations... {percent}% complete')
+            sys.stdout.flush()
 
-import glob
-import re
+        # Convert lists to tensors
+        Logger(f'Message:', os.environ['LOGGER']).info("Converting lists to tensors...")
+        self.X = tf.convert_to_tensor(self.X_list, dtype=tf.float32)  # Adjust dtype if needed
+        self.y = tf.convert_to_tensor(self.y_list, dtype=tf.int32)
+        Logger(f'Message:', os.environ['LOGGER']).info("Conversion complete.")
 
-class DatasetPhenosim(Dataset):
-    def __init__(self,samples,SNP,root_path):
+    def createImages(self, simData: dict):
+        individuals = simData['input'].shape[1]
+        rows = int(individuals / self.columns)
+        genomeImage = GenomeImage(rows, self.columns)
 
-        self.samples = samples
-        self.SNP = SNP
-        self.root_path = root_path
+        for index, sample in enumerate(simData['input']):
+            image = genomeImage.transform_to_image(sample)
+            self.X_list.append(image)  # Append image to the list
+            label = int(simData['labels'][index])
+            self.y_list.append(label)  # Append label
 
-        self.cache = dict()
-
-        self.eval_b = False 
-
-        self.reselect_randomly = False 
-        self.full_dataset = False 
-
-    def __len__(self):
-        files = glob.glob("{path}*0.emma_geno".format(path=self.root_path))
-        try:
-            assert len(files) > 0
-        except:
-            raise click.ClickException('no simulation files found')
-        return len(files) 
-
-    def eval_(self):
-        self.eval_b = True
-
-    def train(self):
-        self.eval_b = False
-
-    def shapes(self):
-        idx = 0
-        return [(key, self.__getitem__(idx)[key].detach().numpy().shape) for key in self.__getitem__(idx).keys()]
-
-    def __getitem__(self,idx):
-
-        if idx in self.cache.keys():
-            cache  = self.cache[idx] 
-
-            data_input = cache['input']
-            data_output = cache['output']
-            causal_SNP = cache['causal']
-            indexes = cache['indexes']
-            population = cache['population']
-
-            if not self.eval_b:
-                if self.reselect_randomly:
-                    n = self.SNP - len(causal_SNP)
-                    indexes = np.random.choice(np.setdiff1d(range(data_input.shape[0]),causal_SNP), n, replace=False)  
-                    indexes = np.concatenate((indexes,causal_SNP))
-                    np.random.shuffle(indexes)
-                return { 'input':torch.from_numpy(data_input[indexes,:]) ,'output': torch.from_numpy(data_output[indexes]),'population': torch.from_numpy(population) }
-            elif self.full_dataset:
-                return { 'input':torch.from_numpy(data_input) , 'output': torch.from_numpy(data_output),'population': torch.from_numpy(population)  }
-            else:
-                
-                indexes = np.random.choice(range(data_input.shape[0]), self.SNP, replace=False)  
-                np.random.shuffle(indexes)
-
-                return { 'input':torch.from_numpy(data_input[indexes,:]) , 'output': torch.from_numpy(data_output[indexes]), 'population': torch.from_numpy(population) }
-
-        f = idx
-
-        genotype_path  = "{base}{f}0.emma_geno".format(f=f,base=self.root_path)
-        NrSNP_path = "{base}{f}0.causal".format(f=f,base=self.root_path)
-        Ysim_path = "{base}{f}0.emma_pheno".format(f=f,base=self.root_path)
-        
-        data_G = pd.read_csv(genotype_path,index_col=None,header=None,sep='\t').fillna(-1)
-        data_SNP = pd.read_csv(NrSNP_path,index_col=None,header=None,sep='\t')
-        data_Ysim = pd.read_csv(Ysim_path,index_col=None,header=None,sep='\t')
-        
-        data_Ysim_sorted = data_Ysim.T.sort_values(by=[0])
-        data_SNP = data_SNP.sort_values(by=[0])
-
-        causal_SNP = data_SNP[1].to_numpy(dtype=int) 
-        causal_SNP_eff = data_SNP[3].to_numpy(dtype=float) 
-
-        min_eff = min(causal_SNP_eff)
-        max_eff = max(causal_SNP_eff)
-
-        if min_eff != max_eff:
-            leftSpan = max_eff - min_eff 
-            rightSpan = 1 
-            causal_SNP_eff = ((causal_SNP_eff - min_eff) / leftSpan)
-        else:
-            causal_SNP_eff = 1 
-
-        
-        sorted_axes = data_Ysim_sorted.index.values
-        data_input = data_G.T.reindex(sorted_axes).T.to_numpy()
-
-        data_output = np.empty(data_input.shape[0])
-        
-        #ISSUE?
-        if 0: 
-            data_output[:] = 0 
-        else:
-            data_output[:] = -1 
-            data_output[causal_SNP] = 1 
-
-        # population = pd.DataFrame(self.init_pop)
-        # population = population.reindex(sorted_axes).to_numpy().flatten()
-
-        embedding = MDS(n_components=1,random_state=0)
-        mds_data = embedding.fit_transform(data_input.T).T
-        
-        # TODO: Ask Sariel what is the connection between -S in the simulation and the -S in the training, it seems if -S in simulation bigger than -S in training 
-        # n here will be negative 
-        n = self.SNP - len(causal_SNP)  
-        
-        indexes = np.random.choice(np.setdiff1d(range(data_input.shape[0]),causal_SNP), n, replace=False)  
-        indexes = np.concatenate((indexes,causal_SNP))
-        np.random.shuffle(indexes)
-        
-        final_output =  { 
-                         'input':torch.from_numpy(data_input[indexes,:]), 
-                         'output': torch.from_numpy(data_output[indexes]),
-                         'population': torch.from_numpy(mds_data)
-                        }
-
-        
-        self.cache[idx] = {
-            'input': data_input,
-            'output':data_output,
-            'causal': causal_SNP,
-            'indexes': indexes,
-            'population': mds_data,
-        }
-
-
-        return final_output
+if __name__ == '__main__':
+    dataset = Dataset(total_simulations=10, causalSamples=4, columns=20)
+    dataset.load_data()
+    print("Data loaded successfully.")
+    print("X shape:", dataset.X.shape)
+    print("y shape:", dataset.y.shape)

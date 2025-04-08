@@ -15,6 +15,7 @@ log_history/
 
 # Ignore specific directories
 ../GWANN_2/vcf_data/
+
 vcf_data/
 
 *.sh

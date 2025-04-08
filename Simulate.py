@@ -9,83 +9,103 @@ import re
 from functools import partial
 import os
 import click 
-from const import SIM_GENOM_PATH, LOWER_BOUND, UPPER_BOUND
+from const import SIM_GENOM_PATH, LOWER_BOUND, UPPER_BOUND, SIMULATIONS
 import shlex
 import subprocess
+from mylogger import Logger
+
+
 
 
 class Simulate:
-    def __init__(self, pop: int, subpop: int, n_samples: int, n_sim: int, n_snps: int, maf: float, miss: float, equal: bool, debug: bool):
+    def __init__(self, SNPs: int, subpop: int, n_samples: int, n_sim: int, causalSNPs: int, maf: float, miss: float, equal: bool, debug: bool, delete: bool):
         """
         Initialize the simulation parameters.
 
         Args:
-            pop (int): Number of SNPs in each simulation.
+            SNPs (int): Number of SNPs in each simulation.
             subpop (int): Number of expected subpopulations.
             n_samples (int): Number of individuals.
             n_sim (int): Number of populations to be simulated.
-            n_snps (int): Number of causal SNPs expected per number of SNP-sites.
+            causalSNPs (int): Number of causal SNPs expected per number of SNP-sites.
             maf (float): Minor allele frequency.
             miss (float): Proportion of missing data.
             equal (bool): Set this if equal variance is expected among SNPs (ignore for single SNP)
             debug (bool): Flag to enable verbose logging for debugging.
+            delete (bool): Flag to delete the current simulated files.
         """
-        self.pop = pop
+        self.SNPs = SNPs
         self.subpop = subpop
         self.n_samples = n_samples
         self.n_sim = n_sim
-        self.n_snps = n_snps
+        self.causalSNPs = causalSNPs
         self.maf = maf
         self.miss = miss
         self.equal = equal
         self.debug = debug
-        
+        self.delete = delete
 
+    def delete_files_in_directory(self, directory_path):
+        for filename in os.listdir(directory_path):
+            file_path = os.path.join(directory_path, filename)
+            # Check if it's a file and not .gitignore
+            if os.path.isfile(file_path) and filename != '.gitignore':
+                os.remove(file_path)
+                # print(f"Deleted: {filename}")
+        
     def simulate(self):
 
         # assert width < n_samples ,"image width is bigger than the number of samples"
         # assert n_samples % width == 0,"image width does not divide the number of samples"
-    
-        json_update(SAMPLES,self.n_samples)
-            
-        seed_arr = self.seed()
+        if self.delete:
+            self.delete_files_in_directory(SIM_PATH)
 
+        json_update(SAMPLES,self.n_samples)
+        json_update(SIMULATIONS,self.n_sim)
+
+        seed_arr = self._seed()
+        
         np.random.shuffle(seed_arr)
         
         # Knowing the number of CPU cores can help you decide how many processes to create for parallel execution.
         cpus = multiprocessing.cpu_count()
         # Create a pool of worker processes to execute tasks concurrently. Here's a breakdown of what it does:
         pool = multiprocessing.Pool(cpus)
-        # TODO: Ask Sariel about the parameters 
-        genome_command, phenosim_command, samples_str = self.generate_commands()
+        Logger(f'Message:', os.environ['LOGGER']).info(f"Pool of workers created with {cpus} CPU cores.")
+        Logger(f'Message:', os.environ['LOGGER']).info(f"Generating commands...")
+        genome_command, phenosim_command, samples_str = self._generate_commands()
+        Logger(f'Message:', os.environ['LOGGER']).info(f"Commands generated with the following parameters: genome_command: {genome_command}\nphenosim_command: {phenosim_command}")
 
         try:
-            self.debug_message1(cpus,samples_str)
-            self.create_simulations(pool, genome_command, phenosim_command, seed_arr)
+            self._debug_message1(cpus,samples_str)
+            Logger(f'Message:', os.environ['LOGGER']).info(f"Creating simulations...")
+            self._create_simulations(pool, genome_command, phenosim_command, seed_arr)
+            Logger(f'Message:', os.environ['LOGGER']).info(f"Simulations created successfully.")
+            pool.close()
         except OSError:
             if not os.path.exists(GENOME_EXE):
                 raise click.ClickException('genome simulator not found') 
-        self.debug_message2()
+        self._debug_message2()
 
     
-    def create_simulations(self,pool, genome_command, phenosim_command, seed_arr):
+    def _create_simulations(self,pool, genome_command, phenosim_command, seed_arr):
             # This is a utility from the functools module. It creates a new function (ss) by pre-filling some arguments of the original function (self.simulate_helper).
-            ss = partial(self.simulate_helper,genome_command,phenosim_command,seed_arr)
+            ss = partial(self._simulate_helper,genome_command,phenosim_command,seed_arr)
             # pool.map: This is a multiprocessing function that applies ss (the worker function) to each element in the provided iterable (range(self.n_sim)).
             pool.map(ss,range(self.n_sim))
     
-    def create_var(self) -> np.ndarray:
-        variance = np.ones(self.n_snps)
+    def _create_var(self) -> np.ndarray:
+        variance = np.ones(self.causalSNPs)
         # set this if equal variance is expected among SNPs (ignore for single SNP)
         if self.equal:
-            variance = (variance / self.n_snps) * 0.99
+            variance = (variance / self.causalSNPs) * 0.99
         else:
             # Function is being used to generate a sample from a Dirichlet distribution
             variance = np.random.dirichlet(variance,size=1) * 0.99
         var_str = np.array2string(variance,precision=5,separator=',',formatter={'float_kind':lambda x: "%.5f" % x})
         return re.sub("\[|\s*|\]","",var_str)
 
-    def seed(self) -> np.ndarray:
+    def _seed(self) -> np.ndarray:
         """
         Generates a seeded population array with random integers added to each element.
 
@@ -93,10 +113,10 @@ class Simulate:
         np.ndarray: An array of integers where each element is a unique integer from 0 to pop-1 
                     with a random integer between LOWER_BOUND=1 and UPPER_BOUND=1000000 added to it.
         """
-        return np.array(list(range(self.pop))) + np.random.randint(LOWER_BOUND, UPPER_BOUND)
+        return np.array(list(range(self.SNPs))) + np.random.randint(LOWER_BOUND, UPPER_BOUND)
 
         
-    def generate_samples_str(self) -> str:
+    def _generate_samples_str(self) -> str:
         """
             Generate a string representation of the sample distribution.
             
@@ -111,16 +131,16 @@ class Simulate:
         tmp2 = self.n_samples - tmp * self.subpop
         # convert the number of samples from an array of strings to one string
         return  " ".join([str(tmp)] * (self.subpop - 1) + [str(tmp + tmp2)])
+
     
 
-
-    def generate_genome_command(self) -> Tuple[List[str], str]:
-        samples_str = self.generate_samples_str()
+    def _generate_genome_command(self) -> Tuple[List[str], str]:
+        samples_str = self._generate_samples_str()
         # In the provided code, the shlex.split function is used to split a command string into a list of arguments, similar to how a shell would parse the command.
-        genome_command = shlex.split(f"{GENOME_EXE} -s {self.pop} -pop {self.subpop} {samples_str} -seed")
+        genome_command = shlex.split(f"{GENOME_EXE} -s {self.SNPs} -pop {self.subpop} {samples_str} -seed")
         return genome_command, samples_str
 
-    def generate_phenosim_command(self) -> str:
+    def _generate_phenosim_command(self) -> str:
         phenosim_command = (
             f"python2 simulation/phenosim/phenosim.py -i G "
             f"-f {SIM_PATH}/genome{{0}}.txt --outfile {SIM_PATH}/{{0}} "
@@ -129,23 +149,39 @@ class Simulate:
         return phenosim_command
     
 
-    def generate_commands(self) -> Tuple[List[str], str]:
+    def _generate_commands(self) -> Tuple[List[str], str]:
         """
         Generate genome and phenosim commands based on given parameters.
 
         Returns:
             tuple: A tuple containing the genome command (list) and the phenosim command (str).
         """
-        genome_command, samples_str = self.generate_genome_command()
-        phenosim_command = self.generate_phenosim_command()
-        if self.n_snps > 1:
-            var_str = self.create_var()
-            phenosim_command += " -n {snps} -v {var}".format(snps=self.n_snps,var=var_str)
+        genome_command, samples_str = self._generate_genome_command()
+        phenosim_command = self._generate_phenosim_command()
+        if self.causalSNPs > 1:
+            var_str = self._create_var()
+            phenosim_command += " -n {snps} -v {var}".format(snps=self.causalSNPs,var=var_str)
         return genome_command, phenosim_command, samples_str
     
 
 
-    def simulate_helper(self, genome_command,phenosim_command,seed,i):
+    def _simulate_helper(self, genome_command,phenosim_command,seed,i):
+        """
+        Helper function to simulate genome and phenotype data.
+
+        This function runs genome and phenotype simulation commands using subprocess calls.
+        It handles exceptions and logs errors if the commands fail.
+
+        Args:
+            genome_command (list): The command to run the genome simulation.
+            phenosim_command (str): The command to run the phenotype simulation.
+            seed (list): A list of seed values for the simulations.
+            i (int): The index of the current simulation.
+
+        Raises:
+            Exception: If the genome simulation command fails.
+            Exception: If the phenotype simulation command fails.
+        """
 
         out_file = open(f'{SIM_GENOM_PATH}{i}.txt','w')
         try:
@@ -161,14 +197,14 @@ class Simulate:
             raise Exception('phenosim failed for {i}; with {e}'.format(i=i, e=e))
         
     
-    def debug_message1(self, cpus:int, samples_str:str):
+    def _debug_message1(self, cpus:int, samples_str:str):
         if self.debug:
             print(f'Mapping using {cpus} CPUs')
             print(f'Output directory: {SIM_PATH}')
-            print(f'Genome parameters: population={self.pop}, subpopulations={self.subpop}, samples={samples_str}')
+            print(f'Genome parameters: population={self.SNPs}, subpopulations={self.subpop}, samples={samples_str}')
             print(f'Phenosim parameters: maf_c={self.maf}, maf_r={self.maf}, miss={self.miss}')
 
-    def debug_message2(self):
+    def _debug_message2(self):
         if self.debug:
             genome_files = glob(f'{SIM_PATH}/genome*.txt')
             emma_files = glob(f'{SIM_PATH}/*.causal')

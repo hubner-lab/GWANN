@@ -12,7 +12,7 @@ import matplotlib.pyplot as plt
 import pandas as pd
 from torch.utils.data import Dataset, DataLoader
 from net import Net
-from dataset import DatasetPhenosim
+from Nimrod.dataset import DatasetPhenosim
 import random
 class Train:
     def __init__(self, epochs,n_snps,batch,ratio,width,sim_path,deterministic,debug,cpu):
@@ -82,18 +82,20 @@ class Train:
             os.environ["CUBLAS_WORKSPACE_CONFIG"] = CUBLAS_WORKSPACE_CONFIG
         
     
-    def set_criterion(self)->None:
+    def _set_criterion(self)->None:
         return nn.MSELoss(),  F.mse_loss
     
-
+    def _set_results_path(self) -> None:
+        if not os.path.exists(RESULTS_PATH):
+            os.mkdir(RESULTS_PATH)
+    
     def __init_data_for_training(self)->None:
              
         json_update(WIDTH,self.width)
         
         self.n_samples = json_get(SAMPLES)
 
-        if not os.path.exists(RESULTS_PATH):
-            os.mkdir(RESULTS_PATH)
+        self._set_results_path()
 
         self.device = CPU if self.cpu else torch.device(CUDA if torch.cuda.is_available() else CPU)
 
@@ -110,7 +112,7 @@ class Train:
 
         self.__debug_info()
 
-        self.criterion, self.criterion_test = self.set_criterion()
+        self.criterion, self.criterion_test = self._set_criterion()
                                                             
         self.optimizer = optim.SGD(self.net.parameters(), lr=LR,momentum=MOMENTUM,weight_decay=WEIGHT_DECAY)
 
@@ -222,11 +224,202 @@ class Train:
         fig.canvas.draw()
         fig.savefig(f'{RESULTS_PATH}/matrix_{e}.png')
 
+
+
+    def _calculate_and_print_metrics(self, e, n_TP, n_TN, n_FP, n_FN, loss):
+        """
+        Calculate and print the performance metrics for a given epoch.
+
+        Parameters:
+        e (int): Epoch number.
+        n_TP (int): Number of true positives.
+        n_TN (int): Number of true negatives.
+        n_FP (int): Number of false positives.
+        n_FN (int): Number of false negatives.
+        loss (float): Loss value for the epoch.
+
+        Returns:
+        dict: Dictionary containing the calculated metrics.
+        """
+        # Calculate metrics
+        accuracy = 100.0*(n_TP+n_TN)/(n_FP+n_FN+n_TN+n_TP) if n_FP+n_FN+n_TN+n_TP > 0 else 0
+        recall = 100.0*(n_TP/(n_TP+n_FN)) if n_TP + n_FN >0 else 0
+        precision = 100.0*(n_TP/(n_TP+n_FP)) if n_TP + n_FP >0 else 0
+        F1 = 100.0*(2.0*n_TP/(2.0*n_TP+n_FP+n_FN)) if n_TP + n_FP + n_FN > 0 else 0 
+        # Print metrics
+        print("Epoch : {0}, Accuracy: {1:.2f}, Recall: {2:.2f}, Precision: {3:.2f}, F1: {4:.2f}, Loss: {5:.5f}".format(
+            e, accuracy, recall, precision, F1, loss
+        ))
+        
+        # Return metrics as a dictionary (optional)
+        return accuracy
+
+    def __update_matrices(self, e,total_loss, times, n_TP, n_FP, n_TN, n_FN):
+        self.loss_arr[e] = total_loss / times
+        self.TP_arr[e] = n_TP
+        self.FP_arr[e] = n_FP
+        self.TN_arr[e] = n_TN
+        self.FN_arr[e] = n_FN
+                
+    def __debug_info(self, 
+                ) -> None:
+        """
+        Print debugging information if debugging is enabled.
+
+        """
+        if self.debug:
+            print("CUDA version : {0}".format(torch.version.cuda))
+            print("CUDNN version : {0}".format(torch.backends.cudnn.version()))
+            print(self.net)
+            print(self.device)
+            print("Simulated SNP sites: {0}, Simulated sample genomes: {1}".format(self.n_snps, self.n_samples))
+            print("Batch size: {0}, Matrix width: {1}".format(self.batch, self.width))
+
+
+
+    def _save_best_model(self):
+        """
+        Save the model if the current accuracy is the highest so far.
+
+        Parameters:
+        max_accuracy (float): The best accuracy recorded so far.
+        
+        Returns:
+        None
+        """
+        torch.save({
+                'model_state_dict': self.net.state_dict(),
+                'optimizer_state_dict': self.optimizer.state_dict(),
+            }, MODEL_PATH_ACCURACY)
+
+
+    def __save_min_loss_model(self,total_loss, times):
+        """
+        Save the model if the current loss is the minimum recorded so far.
+
+        Parameters:
+        net (torch.nn.Module): The neural network model.
+        optimizer (torch.optim.Optimizer): The optimizer used for training.
+        loss (float): The current average loss.
+        min_loss (float): The minimum loss recorded so far.
+        save_path (str): Path to save the model.
+        
+        Returns:
+        float: The updated min_loss.
+        """
+        
+        min_loss = total_loss/times
+        torch.save({
+                'model_state_dict': self.net.state_dict(),
+                'optimizer_state_dict': self.optimizer.state_dict(),
+        }, MODEL_PATH_MIN_LOSS)
+        print(f"Model saved with minimum loss: {min_loss:.5f}")
+        return min_loss
+
+    def _debug_and_compute_metrics(
+    self, inputs, pop, pred, outputs, avr_FP, avr_FN, avr_TP, avr_TN, n_FP, n_FN, n_TP, n_TN
+):
+        """
+        Debug and compute false/true positives and negatives metrics.
+
+        Args:
+            inputs (torch.Tensor): Input tensor from the batch.
+            pop (torch.Tensor): Population tensor.
+            pred (torch.Tensor): Predicted values tensor.
+            outputs (torch.Tensor): Output tensor.
+            avr_FP (torch.Tensor): Average False Positives accumulator.
+            avr_FN (torch.Tensor): Average False Negatives accumulator.
+            avr_TP (torch.Tensor): Average True Positives accumulator.
+            avr_TN (torch.Tensor): Average True Negatives accumulator.
+            n_FP (int): Count of False Positives.
+            n_FN (int): Count of False Negatives.
+            n_TP (int): Count of True Positives.
+            n_TN (int): Count of True Negatives.
+
+        Returns:
+            Updated metrics: avr_FP, avr_FN, avr_TP, avr_TN, n_FP, n_FN, n_TP, n_TN.
+        """
+        
+        x = inputs.detach().clone() 
+        tmp_batch,tmp_n_snps,_ = x.shape
+
+        if tmp_batch != self.batch:
+            return avr_FP, avr_FN, avr_TP, avr_TN, n_FP, n_FN, n_TP, n_TN 
+
+        x = x.view(self.batch,tmp_n_snps,self.width,-1)
+        x = x.view(self.batch*tmp_n_snps,self.width,-1)
+        x = torch.unsqueeze(x,1)
+
+        pop_copy = pop.detach().clone() 
+
+        pop_copy = pop_copy.view(tmp_batch,self.n_samples)
+        pop_copy = pop_copy.view(tmp_batch,self.width,-1)
+        pop_copy = torch.unsqueeze(pop_copy,1)
+
+        # plt.matshow(pop_copy[0,0,:,:].cpu())
+        # plt.savefig("results/test.png")
+        # print(torch.sigmoid(pop_copy[0,0,:,:]))
+        # exit(0)
+
+        pred_copy = pred.detach().clone().flatten()
+        outputs_copy = outputs.detach().clone().flatten() 
+
+
+        min = 0
+
+        ind_tmp = (outputs_copy >= min).nonzero()
+        ind_tmp_2 = (outputs_copy < min).nonzero()
+
+        pred_ind_tmp = (pred_copy >= min).nonzero()
+        pred_ind_tmp_2 = (pred_copy < min).nonzero()
+
+        if self.deterministic: # cuda problem when CUBLAS_WORKSPACE_CONFIG=":16:8"
+            outputs_copy[ind_tmp] = torch.ones(outputs_copy[ind_tmp].shape).to(self.device)  
+            outputs_copy[ind_tmp_2] = - torch.ones(outputs_copy[ind_tmp_2].shape).to(self.device) 
+            pred_copy[pred_ind_tmp] = torch.ones(pred_copy[pred_ind_tmp].shape).to(self.device)  
+            pred_copy[pred_ind_tmp_2] = -torch.ones(pred_copy[pred_ind_tmp_2].shape).to(self.device) 
+        else:
+            outputs_copy[ind_tmp] = 1.
+            outputs_copy[ind_tmp_2] = -1.
+            pred_copy[pred_ind_tmp] = 1
+            pred_copy[pred_ind_tmp_2] = -1.
+
+
+        false_ind = torch.where(outputs_copy != pred_copy)
+        false = pred_copy[false_ind]
+        false_ind = false_ind[0]
+                        
+        true_ind = torch.where(outputs_copy == pred_copy)
+        true = pred_copy[true_ind]
+        true_ind = true_ind[0]
+
+        false_positives = false_ind[torch.where(false == 1)]  
+        false_negatives = false_ind[torch.where(false == -1)] 
+        true_positives = true_ind[torch.where(true == 1)]
+        true_negatives = true_ind[torch.where(true == -1)]
+
+        if len(false_positives) != 0 :
+            avr_FP += torch.mean(x[false_positives,0,:,:],axis=0)
+            n_FP += len(false_positives)
+        if len(false_negatives) != 0:
+            avr_FN += torch.mean(x[false_negatives,0,:,:],axis=0)
+            n_FN += len(false_negatives)
+        if len(true_positives) != 0 :
+            avr_TP += torch.mean(x[true_positives,0,:,:],axis=0)
+            n_TP += len(true_positives)
+        if len(true_negatives) != 0 :
+            avr_TN += torch.mean(x[true_negatives,0,:,:],axis=0)
+            n_TN += len(true_negatives)
+
+        return avr_FP, avr_FN, avr_TP, avr_TN, n_FP, n_FN, n_TP, n_TN
+
+
+    
     def train(self):
         """Train the model on the simulated data"""
         self.__init_data_for_training()
 
-        min_loss,max_accuracy = np.Infinity, 0
+        min_loss, max_accuracy = np.Infinity, 0
 
         if not Path(MODELS_DIR).is_dir():
             Path(MODELS_DIR).mkdir(parents=True,exist_ok=True)
@@ -253,112 +446,28 @@ class Train:
 
                     outputs = self.net(inputs,pop)
 
-                    loss = self.criterion_test(outputs,pred)
+                    loss = self._set_loss(inputs, pred, pop, self.criterion_test)
+
                     total_loss += loss.item()
+
                     times += 1
 
                     if self.debug:
-                        x = inputs.detach().clone() 
-                        tmp_batch,tmp_n_snps,_ = x.shape
-
-                        if tmp_batch != self.batch:
-                            continue 
-
-                        x = x.view(self.batch,tmp_n_snps,self.width,-1)
-                        x = x.view(self.batch*tmp_n_snps,self.width,-1)
-                        x = torch.unsqueeze(x,1)
-
-                        pop_copy = pop.detach().clone() 
-
-                        pop_copy = pop_copy.view(tmp_batch,self.n_samples)
-                        pop_copy = pop_copy.view(tmp_batch,self.width,-1)
-                        pop_copy = torch.unsqueeze(pop_copy,1)
-
-                        # plt.matshow(pop_copy[0,0,:,:].cpu())
-                        # plt.savefig("results/test.png")
-                        # print(torch.sigmoid(pop_copy[0,0,:,:]))
-                        # exit(0)
-
-                        pred_copy = pred.detach().clone().flatten()
-                        outputs_copy = outputs.detach().clone().flatten() 
-
-
-                        min = 0
-
-                        ind_tmp = (outputs_copy >= min).nonzero()
-                        ind_tmp_2 = (outputs_copy < min).nonzero()
-
-                        pred_ind_tmp = (pred_copy >= min).nonzero()
-                        pred_ind_tmp_2 = (pred_copy < min).nonzero()
-
-                        if self.deterministic: # cuda problem when CUBLAS_WORKSPACE_CONFIG=":16:8"
-                            outputs_copy[ind_tmp] = torch.ones(outputs_copy[ind_tmp].shape).to(self.device)  
-                            outputs_copy[ind_tmp_2] = - torch.ones(outputs_copy[ind_tmp_2].shape).to(self.device) 
-                            pred_copy[pred_ind_tmp] = torch.ones(pred_copy[pred_ind_tmp].shape).to(self.device)  
-                            pred_copy[pred_ind_tmp_2] = -torch.ones(pred_copy[pred_ind_tmp_2].shape).to(self.device) 
-                        else:
-                            outputs_copy[ind_tmp] = 1.
-                            outputs_copy[ind_tmp_2] = -1.
-                            pred_copy[pred_ind_tmp] = 1
-                            pred_copy[pred_ind_tmp_2] = -1.
-
-
-                        false_ind = torch.where(outputs_copy != pred_copy)
-                        false = pred_copy[false_ind]
-                        false_ind = false_ind[0]
-                        
-                        true_ind = torch.where(outputs_copy == pred_copy)
-                        true = pred_copy[true_ind]
-                        true_ind = true_ind[0]
-
-                        false_positives = false_ind[torch.where(false == 1)]  
-                        false_negatives = false_ind[torch.where(false == -1)] 
-                        true_positives = true_ind[torch.where(true == 1)]
-                        true_negatives = true_ind[torch.where(true == -1)]
-
-                        if len(false_positives) != 0 :
-                            avr_FP += torch.mean(x[false_positives,0,:,:],axis=0)
-                            n_FP += len(false_positives)
-                        if len(false_negatives) != 0:
-                            avr_FN += torch.mean(x[false_negatives,0,:,:],axis=0)
-                            n_FN += len(false_negatives)
-                        if len(true_positives) != 0 :
-                            avr_TP += torch.mean(x[true_positives,0,:,:],axis=0)
-                            n_TP += len(true_positives)
-                        if len(true_negatives) != 0 :
-                            avr_TN += torch.mean(x[true_negatives,0,:,:],axis=0)
-                            n_TN += len(true_negatives)
-
+                        avr_FP, avr_FN, avr_TP, avr_TN, n_FP, n_FN, n_TP, n_TN = self._debug_and_compute_metrics(inputs, pop,
+                                                                                                                  pred, outputs, 
+                                                                                                                  avr_FP, avr_FN, 
+                                                                                                                  avr_TP, avr_TN,
+                                                                                                                  n_FP, n_FN, 
+                                                                                                                  n_TP, n_TN
+                                                                                                                )
             if self.debug:
-
-                self.loss_arr[e] = total_loss / times
-
-                self.TP_arr[e] = n_TP
-                self.FP_arr[e] = n_FP
-                self.TN_arr[e] = n_TN
-                self.FN_arr[e] = n_FN
-
+                self.__update_matrices(e, total_loss, times, n_TP, n_FP, n_TN, n_FN)
                 # print("FP: {0}, FN : {1}, TP: {2}, TN: {3}".format(n_FP,n_FN,n_TP,n_TN))
-                accuracy = 100.0*(n_TP+n_TN)/(n_FP+n_FN+n_TN+n_TP)
-                recall = 100.0*(n_TP/(n_TP+n_FN)) if n_TP + n_FN >0 else 0
-                precision = 100.0*(n_TP/(n_TP+n_FP)) if n_TP + n_FP >0 else 0
-                F1 = 100.0*(2.0*n_TP/(2.0*n_TP+n_FP+n_FN)) if n_TP + n_FP + n_FN > 0 else 0 
-                print("Epoch : {0}, Accuracy: {1:.2f}, Recall: {2:.2f}, Precision: {3:.2f} F1: {4:.2f}, loss : {5:.5f}".format(
-                    e,
-                    accuracy,
-                    recall,
-                    precision,
-                    F1,
-                    self.loss_arr[e] 
-                ))
-
-
-                if max_accuracy < accuracy:
-                    accuracy = max_accuracy
-                    torch.save({
-                        'model_state_dict': self.net.state_dict(),
-                        'optimizer_state_dict': self.optimizer.state_dict(),
-                    }, "models/net-accuracy.pt")
+                self.accuracy =  self._calculate_and_print_metrics(e, n_TP, n_TN, n_FP, n_FN, loss)
+            
+            if max_accuracy < self.accuracy:
+                self.accuracy = max_accuracy
+                self._save_best_model()
 
                 if PLOT_AVERAGE and e % 20 == 0:
                     self._plot_average_matrices(e, fig, ax, avr_FP, avr_FN, avr_TP, avr_TN, n_FP, n_FN, n_TP, n_TN)
@@ -366,27 +475,23 @@ class Train:
                 print("Epoch: {0}".format(e))
 
             if total_loss/times < min_loss:
-                min_loss  = total_loss/times
-                torch.save({
-                    'model_state_dict': self.net.state_dict(),
-                    'optimizer_state_dict': self.optimizer.state_dict(),
-                }, "models/net.pt")
+                min_loss = self.__save_min_loss_model(total_loss, times)
         
             self.full_dataset.train()
+            
             self.net.train()
 
             for i,data in enumerate(self.dataloader_train):
                 self.optimizer.zero_grad()
 
-                inputs = data['input'].float().to(self.device)
-                pred = data['output'].float().to(self.device)
-                pop = data['population'].float().to(self.device)
-
-                outputs = self.net(inputs,pop)
+                inputs, pred, pop = self._prepare_batch(data)
                 
-                loss = self.criterion(outputs, pred)
+                loss =  self._set_loss(inputs, pred, pop, self.criterion)
+
                 loss.backward()
-                torch.nn.utils.clip_grad_norm_(self.net.parameters(), CLIP_GRAD_NOEM)
+
+                torch.nn.utils.clip_grad_norm_(self.net.parameters(), CLIP_GRAD_NORM)
+
                 self.optimizer.step()    
 
             if e % 100 == 0:
@@ -394,26 +499,16 @@ class Train:
 
 
         if self.debug:
-            data = {'TP':self.TP_arr,'TN':self.TN_arr,'FP':self.FP_arr,'FN':self.FN_arr,'loss':self.loss_arr}
-            df_stats = pd.DataFrame(data)
-            df_stats.to_csv('{results_path}/stats-r{ratio}.csv'.format(results_path=RESULTS_PATH,ratio=self.n_snps))
+            self._write_to_stats()
 
-            
-    def __debug_info(self, 
-                ) -> None:
-        """
-        Print debugging information if debugging is enabled.
+    def _write_to_stats(self) -> None :
+        data = {'TP':self.TP_arr,'TN':self.TN_arr,'FP':self.FP_arr,'FN':self.FN_arr,'loss':self.loss_arr}
+        df_stats = pd.DataFrame(data)
+        df_stats.to_csv('{results_path}/stats-r{ratio}.csv'.format(results_path=RESULTS_PATH,ratio=self.n_snps))
 
-        """
-        if self.debug:
-            print("CUDA version : {0}".format(torch.version.cuda))
-            print("CUDNN version : {0}".format(torch.backends.cudnn.version()))
-            print(self.net)
-            print(self.device)
-            print("Simulated SNP sites: {0}, Simulated sample genomes: {1}".format(self.n_snps, self.n_samples))
-            print("Batch size: {0}, Matrix width: {1}".format(self.batch, self.width))
-
-
+    def _set_loss(self, inputs, pred, pop, func):
+        outputs = self.net(inputs,pop)
+        return func(outputs, pred)
 
 if __name__ == "__main__":
     train = Train(1000,1000,32,0.8,10,"simulations/simulated_data.csv",False,True,False)
