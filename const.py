@@ -31,6 +31,6 @@ POPULATION = 'population'
 PLOT_SIZE = 2
 MODEL_PATH_ACCURACY = "models/net-accuracy.pt"
 MODEL_PATH_MIN_LOSS = "models/net.pt"
-MODEL_PATH_TENSOR = 'models/trained_model.h5'
+MODEL_PATH_TENSOR_DIR = './models'
 LOGGER_DIR = 'logs'
 LOGGER_FILE ='logger'

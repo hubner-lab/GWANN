@@ -1,7 +1,8 @@
 from const import JSON_FILE, current_dict
 import json 
+from typing import Any
 
-def json_update(key: str ,param:int) -> None:
+def json_update(key: str ,param:Any) -> None:
     """
     Update the JSON file with a new value for the specified key.
 

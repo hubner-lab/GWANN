@@ -3,11 +3,14 @@ from sklearn.model_selection import train_test_split
 from tensorflow import keras
 from keras import layers
 import numpy as np
-from const import MODEL_PATH_TENSOR
+from const import MODEL_PATH_TENSOR_DIR
 from mylogger import Logger
 import os 
+from utilities import json_update
 class Train:
-    def __init__(self, total_simulations:int, CausalSamples: int, columns:int , batch_size:int , epochs:int, simPath: str = "./simulation/data/", test_ratio:float=0.2):
+    def __init__(self,model_name:str, total_simulations:int, CausalSamples: int, columns:int ,
+                  batch_size:int , epochs:int, simPath: str = "./simulation/data/", test_ratio:float=0.2):
+        self.model_name = model_name
         self.dataset = Dataset(total_simulations, CausalSamples, columns, simPath)
         self.batch_size = batch_size
         self.epochs = epochs
@@ -58,7 +61,9 @@ class Train:
         Logger(f'Message:', os.environ['LOGGER']).info("Training model...") 
         model.fit(X_train, y_train, epochs=self.epochs, batch_size=self.batch_size, verbose=1)
 
-        model.save(MODEL_PATH_TENSOR)  # Saves the model as a .h5 file
+        json_update("model_name", f"{MODEL_PATH_TENSOR_DIR}/{self.model_name}.h5")
+        Logger(f'Message:',f"Model name updated to {MODEL_PATH_TENSOR_DIR}/{self.model_name}.h5")
+        model.save(f"{MODEL_PATH_TENSOR_DIR}/{self.model_name}.h5")  # Saves the model as a .h5 file
         
         test_loss, test_acc = model.evaluate(X_test, y_test)
         print('test loss', test_loss)

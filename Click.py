@@ -24,7 +24,7 @@ class CLIManager:
     @click.option('-v', '--vcf', 'vcf', required=True, help='path to the VCF file')
     @click.option('-p', '--pheno','pheno_path',required=True,help='path to the phenotype file (comma seperated csv file)')
     @click.option('-t', '--trait','trait',required=True,help='name of the trait (header in the phenotype file)')
-    @click.option('--model','model',default="models/net.pt",help="path to the network model generated in the training step")
+    @click.option('--model','model',default=None,help="path to the network model generated in the training step")
     @click.option('--output','output_path',default="results/GWAS",help="prefix of output plot and causative SNPs indexes in the VCF")
     @click.option('--cpu/;','cpu',default=False,required=False,help="force on cpu")
     def run(
@@ -49,8 +49,10 @@ class CLIManager:
             output_path (str): Output file prefix for plots and SNP indexes.
             cpu (bool): Flag to force CPU usage for computation.
         """
-        Logger(f'Message:', os.environ['LOGGER']).debug(f"Running GWANN analysis with VCF: {vcf}, phenotype path: {pheno_path}, trait: {trait}, model: {model}, output path: {output_path}")
-        Run(vcf, pheno_path, trait, model, output_path, cpu).start()
+        modelPath = json_get("model_name") 
+        modelPath = modelPath if model is None else model
+        Logger(f'Message:', os.environ['LOGGER']).debug(f"Running GWANN analysis with VCF: {vcf}, phenotype path: {pheno_path}, trait: {trait}, model: {modelPath}, output path: {output_path}")
+        Run(vcf, pheno_path, trait, modelPath, output_path, cpu).start()
         pass
 
     @staticmethod
@@ -99,6 +101,7 @@ class CLIManager:
 
     @staticmethod
     @click.command()
+    @click.option('-M', '--MN', 'model_name', required=True, type=str, help="Model name to be saved")
     @click.option('-e', '--epochs', 'epochs', default=100, type=int, help="Number of training iterations")
     @click.option('-S', '--SNPs', 'n_snps', required=True, type=int, help="Number of SNP sites to be randomly sampled per batch")
     @click.option('-b', '--batch', 'batch', default=20, type=int, help="Batch size")
@@ -109,6 +112,7 @@ class CLIManager:
     @click.option('--deterministic', 'deterministic', default=False, is_flag=True, help="Set for reproducibility")
     @click.option('--cpu', 'cpu', default=False, is_flag=True, help="Force training on CPU")
     def train(
+        model_name: str,
         epochs: int, 
         n_snps: int, 
         batch: int, 
@@ -139,9 +143,9 @@ class CLIManager:
         Returns:
             None: This function does not return any value.
         """
-        Logger(f'Message:', os.environ['LOGGER']).debug(f"Training with {epochs} epochs, {n_snps} sampled SNPs, batch size {batch}, ratio {ratio}, width {width}, path {sim_path}")
+        Logger(f'Message:', os.environ['LOGGER']).debug(f"Training with {epochs} epochs, {n_snps} sampled SNPs, batch size {batch}, ratio {ratio}, width {width}, path {sim_path}, model name {model_name}")
         total_simulations = json_get(SIMULATIONS)
-        Train(total_simulations, n_snps, width, batch, epochs, sim_path, ratio ).run()
+        Train(model_name, total_simulations, n_snps, width, batch, epochs, sim_path, ratio ).run()
         
 
     def register_commands(self):

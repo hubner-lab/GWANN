@@ -28,7 +28,7 @@ def createImages(columns, data, sim_indivduals):
 
 
 class Run:
-    def __init__(self,vcf, pheno_path, trait, model, output_path, cpu):
+    def __init__(self,vcf, pheno_path, trait,model, output_path, cpu):
         self.vcf = vcf
         self.pheno_path = pheno_path
         self.trait = trait
