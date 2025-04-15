@@ -10,6 +10,7 @@ from utilities import json_get
 from mylogger import Logger
 import os 
 from scipy.special import logit
+from const import VCF_DATA_DIR
 
 def createImages(columns, data, sim_indivduals):
     X_list = []
@@ -35,35 +36,20 @@ class Run:
         self.model_path = model
         self.output_path = output_path
         self.cpu = cpu
+        self.width = json_get("width")
+        self.sim_indivduals = json_get("samples")
 
 
-    def start(self):
-        """Run on real data using a trained TensorFlow model"""
-        width = json_get("width")
-        sim_indivduals = json_get("samples")
-        if not Path("vcf_data").is_dir():
-            Path("vcf_data").mkdir(parents=True, exist_ok=True)
 
-        npz_loc = f"vcf_data/{Path(self.vcf).stem}.npz"
+    def load_and_parse_data(self):
+        if not Path(VCF_DATA_DIR).is_dir():
+            Path(VCF_DATA_DIR).mkdir(parents=True, exist_ok=True)
 
-
+        npz_loc = f"{VCF_DATA_DIR}/{Path(self.vcf).stem}.npz"
         Logger(f'Message:', os.environ['LOGGER']).info(f"Loading VCF file: {self.vcf}")
+
         callset = np.load(npz_loc, allow_pickle=True)
-
         Logger(f'Message:', os.environ['LOGGER']).info(f"Parsing VCF file: {self.vcf}")
-        vcf_data = callset['calldata/GT']
-        vcf_samples = callset['samples']
-        chrom = callset['variants/CHROM']
-
-        tmp_vcf = (vcf_data[:, :, 0] + vcf_data[:, :, 1]) / 2
-        tmp_vcf[np.where(tmp_vcf == 0.5)] = 0
-
-
-        # print('Running MDS for population structure...')
-        # embedding = MDS(n_components=1, random_state=0)
-        # mds_data = embedding.fit_transform(tmp_vcf.T)
-
-        # pop = np.expand_dims(mds_data, axis=-1)  # Ensure correct shape for the model
 
         if not Path(self.pheno_path).is_file():
             print("Invalid phenotype file")
@@ -75,22 +61,20 @@ class Run:
             raise ValueError('Sample field missing in phenotype file')
         if self.trait not in pheno.keys():
             raise ValueError('Trait field missing in phenotype file')
+        
+        return callset['calldata/GT'], callset['samples'], callset['variants/CHROM'], pheno 
 
-        _, index_samples, index_samples_pheno = np.intersect1d(vcf_samples, pheno["sample"], return_indices=True)
-        final_vcf = tmp_vcf
-        final_vcf = final_vcf[:, index_samples]
-        pheno = pheno.loc[index_samples_pheno].reset_index()
+    def calc_avg_vcf(self, vcf_data):
+        tmp_vcf = (vcf_data[:, :, 0] + vcf_data[:, :, 1]) / 2
+        tmp_vcf[np.where(tmp_vcf == 0.5)] = 0
+        return tmp_vcf
+    
 
-        pheno_sorted = pheno.sort_values(by=[self.trait, "sample"], na_position='first')
-        sorted_axes = np.array(pheno_sorted.index.values)
-        sorted_vcf = final_vcf[:, sorted_axes]
+    def load_model_and_predict(self, sorted_vcf):
+        
+        # Reshape input to match model expectatons
 
-        chrom_arr = np.unique(chrom)
-        chrom_labels =  chrom_arr[ np.argsort([int(x[2:]) for x in chrom_arr])] 
-
-        # Reshape input to match model expectations
-
-        X_input = np.expand_dims(createImages(width,  sorted_vcf, sim_indivduals), axis=-1)  # Add channel dim (height, width, 1)
+        X_input = np.expand_dims(createImages(self.width,  sorted_vcf, self.sim_indivduals), axis=-1)  # Add channel dim (height, width, 1)
 
         Logger(f'Message:', os.environ['LOGGER']).info(f"Loading trained TensorFlow model: {self.model_path}...")
         model = load_model(self.model_path)
@@ -111,6 +95,11 @@ class Run:
         df = pd.DataFrame({"value": predictions.flatten() }, index=range(len(output)))
         df.to_csv(f"{self.output_path}.csv")
 
+        return logitoutput
+
+    def plot_data(self, chrom, logitoutput):
+        chrom_arr = np.unique(chrom)
+        chrom_labels =  chrom_arr[ np.argsort([int(x[2:]) for x in chrom_arr])] 
 
         Logger(f'Message:', os.environ['LOGGER']).info(f"Generating scatter plot...")
         plt.figure(figsize=(12, 5))
@@ -143,6 +132,35 @@ class Run:
         plt.tight_layout()
         plt.legend(markerscale=6, bbox_to_anchor=(1.02, 1), loc='upper left', fontsize='small')
         plt.savefig(f"{self.output_path}.png")
+        Logger(f'Message:', os.environ['LOGGER']).info(f"Scatter plot saved to {self.output_path}.png")
+
+    def start(self):
+        """Run on real data using a trained TensorFlow model"""
+
+
+        vcf_data, vcf_samples, chrom, pheno = self.load_and_parse_data()
+
+        tmp_vcf = self.calc_avg_vcf(vcf_data)
+
+        # print('Running MDS for population structure...')
+        # embedding = MDS(n_components=1, random_state=0)
+        # mds_data = embedding.fit_transform(tmp_vcf.T)
+
+        # pop = np.expand_dims(mds_data, axis=-1)  # Ensure correct shape for the model
+
+        _, index_samples, index_samples_pheno = np.intersect1d(vcf_samples, pheno["sample"], return_indices=True)
+        final_vcf = tmp_vcf
+        final_vcf = final_vcf[:, index_samples]
+        pheno = pheno.loc[index_samples_pheno].reset_index()
+
+        pheno_sorted = pheno.sort_values(by=[self.trait, "sample"], na_position='first')
+        sorted_axes = np.array(pheno_sorted.index.values)
+        sorted_vcf = final_vcf[:, sorted_axes]
+
+
+        logitoutput = self.load_model_and_predict(sorted_vcf)
+
+        self.plot_data(chrom, logitoutput)
 
 
 

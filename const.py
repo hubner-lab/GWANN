@@ -34,3 +34,4 @@ MODEL_PATH_MIN_LOSS = "models/net.pt"
 MODEL_PATH_TENSOR_DIR = './models'
 LOGGER_DIR = 'logs'
 LOGGER_FILE ='logger'
+VCF_DATA_DIR = 'vcf_data'

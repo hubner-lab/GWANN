@@ -1,6 +1,7 @@
 import click
 from Simulate import Simulate
-from train import Train
+# from train import Train
+from train2 import Train
 from run import Run
 from utilities import json_get
 import resource
