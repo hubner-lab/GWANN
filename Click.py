@@ -2,7 +2,8 @@ import click
 from Simulate import Simulate
 # from train import Train
 from train2 import Train
-from run import Run
+#from run import Run
+from run2 import Run
 from utilities import json_get
 import resource
 from const import SIMULATIONS, LOGGER_DIR, LOGGER_FILE
