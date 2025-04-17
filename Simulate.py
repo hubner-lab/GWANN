@@ -71,16 +71,16 @@ class Simulate:
         cpus = multiprocessing.cpu_count()
         # Create a pool of worker processes to execute tasks concurrently. Here's a breakdown of what it does:
         pool = multiprocessing.Pool(cpus)
-        Logger(f'Message:', os.environ['LOGGER']).info(f"Pool of workers created with {cpus} CPU cores.")
-        Logger(f'Message:', os.environ['LOGGER']).info(f"Generating commands...")
+        Logger(f'Message:', f"{os.environ['LOGGER']}").info(f"Pool of workers created with {cpus} CPU cores.")
+        Logger(f'Message:', f"{os.environ['LOGGER']}").info(f"Generating commands...")
         genome_command, phenosim_command, samples_str = self._generate_commands()
-        Logger(f'Message:', os.environ['LOGGER']).info(f"Commands generated with the following parameters: genome_command: {genome_command}\nphenosim_command: {phenosim_command}")
+        Logger(f'Message:', f"{os.environ['LOGGER']}").info(f"Commands generated with the following parameters: genome_command: {genome_command}\nphenosim_command: {phenosim_command}")
 
         try:
             self._debug_message1(cpus,samples_str)
-            Logger(f'Message:', os.environ['LOGGER']).info(f"Creating simulations...")
+            Logger(f'Message:', f"{os.environ['LOGGER']}").info(f"Creating simulations...")
             self._create_simulations(pool, genome_command, phenosim_command, seed_arr)
-            Logger(f'Message:', os.environ['LOGGER']).info(f"Simulations created successfully.")
+            Logger(f'Message:', f"{os.environ['LOGGER']}").info(f"Simulations created successfully.")
             pool.close()
         except OSError:
             if not os.path.exists(GENOME_EXE):

@@ -3,28 +3,13 @@ import pandas as pd
 from pathlib import Path
 from sklearn.manifold import MDS
 import matplotlib.pyplot as plt
-import tensorflow as tf
 from tensorflow.keras.models import load_model
-from genomeToImage import GenomeImage
-from utilities import json_get
+from utilities import json_get, createImages
 from mylogger import Logger
 import os 
 from scipy.special import logit
 from const import VCF_DATA_DIR
 
-def createImages(columns, data, sim_indivduals):
-    X_list = []
-    individuals = data.shape[1]
-    if individuals  < sim_indivduals:
-        pad = np.zeros((data.shape[0], sim_indivduals - individuals))
-        data = np.concatenate((data, pad), axis=1)
-    rows = int(sim_indivduals / columns)
-    genomeImage = GenomeImage(rows, columns)
-    for sample in data:
-        image = genomeImage.transform_to_image(sample)
-        X_list.append(image)  # Append image to the list
-    X = tf.convert_to_tensor(X_list, dtype=tf.float32)  # Adjust dtype if needed
-    return X
 
 
 
@@ -46,16 +31,16 @@ class Run:
             Path(VCF_DATA_DIR).mkdir(parents=True, exist_ok=True)
 
         npz_loc = f"{VCF_DATA_DIR}/{Path(self.vcf).stem}.npz"
-        Logger(f'Message:', os.environ['LOGGER']).info(f"Loading VCF file: {self.vcf}")
+        Logger(f'Message:', f"{os.environ['LOGGER']}").info(f"Loading VCF file: {self.vcf}")
 
         callset = np.load(npz_loc, allow_pickle=True)
-        Logger(f'Message:', os.environ['LOGGER']).info(f"Parsing VCF file: {self.vcf}")
+        Logger(f'Message:', f"{os.environ['LOGGER']}").info(f"Parsing VCF file: {self.vcf}")
 
         if not Path(self.pheno_path).is_file():
             print("Invalid phenotype file")
             exit(1)
 
-        Logger(f'Message:', os.environ['LOGGER']).info(f"Loading phenotype file: {self.pheno_path}")
+        Logger(f'Message:', f"{os.environ['LOGGER']}").info(f"Loading phenotype file: {self.pheno_path}")
         pheno = pd.read_csv(self.pheno_path, index_col=None, sep=',')
         if 'sample' not in pheno.keys():
             raise ValueError('Sample field missing in phenotype file')
@@ -71,15 +56,21 @@ class Run:
     
 
     def load_model_and_predict(self, sorted_vcf, pop):
-        
+        """Load the model and make predictions on the data
+        Args:
+            sorted_vcf (np.ndarray): The sorted VCF data.
+            pop (np.ndarray): population structure.
+        Returns: 
+        """
         # Reshape input to match model expectatons
         X_input = np.expand_dims(createImages(self.width,  sorted_vcf, self.sim_indivduals), axis=-1)  # Add channel dim (height, width, 1)
-        pop = np.repeat(pop, X_input.shape[0], axis=0)
 
-        Logger(f'Message:', os.environ['LOGGER']).info(f"Loading trained TensorFlow model: {self.model_path}...")
+        pop = np.repeat(pop, X_input.shape[0], axis=0) # repeat the population structure to match the number of samples
+
+        Logger(f'Message:', f"{os.environ['LOGGER']}").info(f"Loading trained TensorFlow model: {self.model_path}...")
         model = load_model(self.model_path)
 
-        Logger(f'Message:', os.environ['LOGGER']).info("Running inference on the model...")
+        Logger(f'Message:', f"{os.environ['LOGGER']}").info("Running inference on the model...")
         # Pass both inputs as a list to predict
         predictions = model.predict([X_input, pop], batch_size=4096)
         output = predictions.flatten()
@@ -97,7 +88,7 @@ class Run:
         chrom_arr = np.unique(chrom)
         chrom_labels =  chrom_arr[ np.argsort([int(x[2:]) for x in chrom_arr])] 
 
-        Logger(f'Message:', os.environ['LOGGER']).info(f"Generating scatter plot...")
+        Logger(f'Message:', f"{os.environ['LOGGER']}").info(f"Generating scatter plot...")
         plt.figure(figsize=(12, 5))
 
         x_ticks = []
@@ -128,29 +119,22 @@ class Run:
         plt.tight_layout()
         plt.legend(markerscale=6, bbox_to_anchor=(1.02, 1), loc='upper left', fontsize='small')
         plt.savefig(f"{self.output_path}.png")
-        Logger(f'Message:', os.environ['LOGGER']).info(f"Scatter plot saved to {self.output_path}.png")
+        Logger(f'Message:', f"{os.environ['LOGGER']}").info(f"Scatter plot saved to {self.output_path}.png")
 
     def start(self):
         """Run on real data using a trained TensorFlow model"""
 
 
-        vcf_data, vcf_samples, chrom, pheno = self.load_and_parse_data()
+        vcf_data, vcf_samples, chromosomes, pheno = self.load_and_parse_data()
 
         tmp_vcf = self.calc_avg_vcf(vcf_data)
 
-        # print('Running MDS for population structure...')
-        # embedding = MDS(n_components=1, random_state=0)
-        # mds_data = embedding.fit_transform(tmp_vcf.T)
-
-        # pop = np.expand_dims(mds_data, axis=-1)  # Ensure correct shape for the model
-
-        samples = json_get("samples")
         embedding = MDS(n_components=1, random_state=0, normalized_stress="auto")
         pop = embedding.fit_transform(tmp_vcf.T).T
 
         # Pad the vector pop with zeros to match the length of samples
-        if pop.shape[1] < samples:
-            pad_width = samples - pop.shape[1]
+        if pop.shape[1] < self.sim_indivduals:
+            pad_width = self.sim_indivduals - pop.shape[1]
             pop = np.pad(pop, ((0, 0), (0, pad_width)), mode='constant', constant_values=0)
 
         _, index_samples, index_samples_pheno = np.intersect1d(vcf_samples, pheno["sample"], return_indices=True)
@@ -165,7 +149,7 @@ class Run:
 
         logitoutput = self.load_model_and_predict(sorted_vcf, pop)
 
-        self.plot_data(chrom, logitoutput)
+        self.plot_data(chromosomes, logitoutput)
 
 
 

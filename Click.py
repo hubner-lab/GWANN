@@ -1,16 +1,35 @@
 import click
 from Simulate import Simulate
 # from train import Train
-from train2 import Train
+# from train2 import Train
+from train3 import Train
 #from run import Run
 from run2 import Run
-from utilities import json_get
+from utilities import json_get, json_update
 import resource
-from const import SIMULATIONS, LOGGER_DIR, LOGGER_FILE
+from const import SIMULATIONS, LOGGER_DIR
 import datetime
 from mylogger import Logger
 import os
-os.environ['LOGGER'] = f'{LOGGER_DIR}/{LOGGER_FILE}_{datetime.datetime.now().strftime("%Y-%m-%d_%H-%M-%S")}.log'
+import time
+import resource
+import logging
+
+def log_resource_usage(start_time, logger, label=""):
+    end_time = time.time()
+    usage = resource.getrusage(resource.RUSAGE_SELF)
+
+    runtime = end_time - start_time
+    mem_usage = usage.ru_maxrss / 1024  # MB
+    user_cpu = usage.ru_utime
+    sys_cpu = usage.ru_stime
+
+    # Colored console output using logger (assumes StreamHandler supports color)
+    logger.info(f"\033[96m{label} - Runtime: {runtime:.2f}s\033[0m")         # Cyan
+    logger.info(f"\033[93m{label} - Max Memory Usage: {mem_usage:.2f} MB\033[0m")  # Yellow
+    logger.info(f"\033[94m{label} - User CPU time: {user_cpu:.2f}s\033[0m")   # Blue
+    logger.info(f"\033[94m{label} - System CPU time: {sys_cpu:.2f}s\033[0m")  # Blue
+
 class CLIManager:
     def __init__(self):
         """Initialize the CLI Manager.
@@ -51,10 +70,15 @@ class CLIManager:
             output_path (str): Output file prefix for plots and SNP indexes.
             cpu (bool): Flag to force CPU usage for computation.
         """
+        start_time = time.time()
         modelPath = json_get("model_name") 
         modelPath = modelPath if model is None else model
-        Logger(f'Message:', os.environ['LOGGER']).debug(f"Running GWANN analysis with VCF: {vcf}, phenotype path: {pheno_path}, trait: {trait}, model: {modelPath}, output path: {output_path}")
+        json_update("current_command", 'run')
+        LOGGER_FILE = "run"
+        os.environ['LOGGER'] = f'{LOGGER_DIR}/{LOGGER_FILE}_{datetime.datetime.now().strftime("%Y-%m-%d_%H-%M-%S")}.log'
+        Logger(f'Message:', f"{os.environ['LOGGER']}").debug(f"Running GWANN analysis with VCF: {vcf}, phenotype path: {pheno_path}, trait: {trait}, model: {modelPath}, output path: {output_path}")
         Run(vcf, pheno_path, trait, modelPath, output_path, cpu).start()
+        log_resource_usage(start_time,Logger(f'Message:', f"{os.environ['LOGGER']}"),"Run")
         pass
 
     @staticmethod
@@ -98,8 +122,12 @@ class CLIManager:
             equal (bool): Set this if equal variance is expected among SNPs (ignore for single SNP)
             debug (bool): Flag to enable verbose logging for debugging.
         """
-        Logger(f'Message:', os.environ['LOGGER']).debug(f"Simulating {n_sim} populations with {pop} SNPs, {subpop} subpopulations, {n_samples} samples, {n_snps} causal SNPs, MAF: {maf}, missing data: {miss}, equal variance: {equal}")
+        start_time = time.time()
+        LOGGER_FILE = "simulate"
+        os.environ['LOGGER'] = f'{LOGGER_DIR}/{LOGGER_FILE}_{datetime.datetime.now().strftime("%Y-%m-%d_%H-%M-%S")}.log'
+        Logger(f'Message:', f"{os.environ['LOGGER']}").debug(f"Simulating {n_sim} populations with {pop} SNPs, {subpop} subpopulations, {n_samples} samples, {n_snps} causal SNPs, MAF: {maf}, missing data: {miss}, equal variance: {equal}")
         Simulate(pop, subpop, n_samples, n_sim, n_snps, maf, miss, equal, debug, delete).simulate()
+        log_resource_usage(start_time,Logger(f'Message:', f"{os.environ['LOGGER']}"), "Simulate")
 
     @staticmethod
     @click.command()
@@ -145,9 +173,13 @@ class CLIManager:
         Returns:
             None: This function does not return any value.
         """
-        Logger(f'Message:', os.environ['LOGGER']).debug(f"Training with {epochs} epochs, {n_snps} sampled SNPs, batch size {batch}, ratio {ratio}, width {width}, path {sim_path}, model name {model_name}")
+        start_time = time.time()
+        LOGGER_FILE = "train"
+        os.environ['LOGGER'] = f'{LOGGER_DIR}/{LOGGER_FILE}_{datetime.datetime.now().strftime("%Y-%m-%d_%H-%M-%S")}.log'
+        Logger(f'Message:', f"{os.environ['LOGGER']}").debug(f"Training with {epochs} epochs, {n_snps} sampled SNPs, batch size {batch}, ratio {ratio}, width {width}, path {sim_path}, model name {model_name}")
         total_simulations = json_get(SIMULATIONS)
         Train(model_name, total_simulations, n_snps, width, batch, epochs, sim_path, ratio ).run()
+        log_resource_usage(start_time,Logger(f'Message:', f"{os.environ['LOGGER']}"), "Train")
         
 
     def register_commands(self):

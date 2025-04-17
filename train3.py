@@ -7,8 +7,9 @@ import numpy as np
 from const import MODEL_PATH_TENSOR_DIR
 from mylogger import Logger
 import os 
+from keras.callbacks import ModelCheckpoint
 from utilities import json_update, json_get
-
+import tensorflow as tf
 class Train:
     def __init__(self, model_name:str, total_simulations:int, CausalSamples: int, columns:int,
                  batch_size:int, epochs:int, simPath: str = "./simulation/data/", test_ratio:float = 0.2):
@@ -81,8 +82,48 @@ class Train:
         model.summary()
         model.compile(optimizer='rmsprop', loss='binary_crossentropy', metrics=['accuracy'])
 
+        checkpoint_path = f"{MODEL_PATH_TENSOR_DIR}/{self.model_name}.h5"  
+        checkpoint = ModelCheckpoint(
+                filepath=checkpoint_path,
+                monitor='val_accuracy',           # or 'val_accuracy' / 'val_acc'
+                save_best_only=True,
+                save_weights_only=False,
+                verbose=1
+                )
+
+        train_dataset = tf.data.Dataset.from_tensor_slices(((X_train, pop_train), y_train))
+        train_dataset = train_dataset.shuffle(buffer_size=1024).batch(self.batch_size).prefetch(tf.data.AUTOTUNE)
+
+        val_dataset = tf.data.Dataset.from_tensor_slices(((X_test, pop_test), y_test))
+        val_dataset = val_dataset.batch(self.batch_size).prefetch(tf.data.AUTOTUNE)
+
+
         Logger(f'Message:', f"{os.environ['LOGGER']}").info("Training model...")
-        model.fit([X_train, pop_train], y_train, epochs=self.epochs, batch_size=self.batch_size, verbose=1)
+        # model.fit([X_train, pop_train],y_train, 
+        #           validation_data=([X_test, pop_test], y_test),
+        #           epochs=self.epochs,
+        #           batch_size=self.batch_size,
+        #           callbacks=[checkpoint],
+        #           verbose=1,
+        #           use_multiprocessing=True,
+        #           workers=4,
+        #           )
+
+        cpus = os.cpu_count() or 4
+
+        model.fit(
+                    x=[X_train, pop_train],
+                    y=y_train,
+                    validation_data=([X_test, pop_test], y_test),
+                    epochs=self.epochs,
+                    batch_size=self.batch_size,
+                    callbacks=[checkpoint],
+                    verbose=1,
+                    workers=cpus,
+                    use_multiprocessing=True,
+                )
+
+
 
         json_update("model_name", f"{MODEL_PATH_TENSOR_DIR}/{self.model_name}.h5")
         Logger(f'Message:', f"Model name updated to {MODEL_PATH_TENSOR_DIR}/{self.model_name}.h5")

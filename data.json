@@ -1,1 +1,1 @@
-{"samples": 300, "width": 20, "simulations": 1000, "model_name": "./models/debugModel.h5"}
+{"samples": 300, "width": 20, "simulations": 200, "model_name": "./models/model22.h5", "current_command": "run"}

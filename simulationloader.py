@@ -22,7 +22,7 @@ class SimulationDataReader:
 
         self.phone_arg_sorted = None
 
-        self.pheno_data_sorted = None
+        # self.pheno_data_sorted = None
         self.geno_data_reordered = None
         self.causal_sorted = None
 
@@ -40,14 +40,6 @@ class SimulationDataReader:
         mds_data = self.apply_mds_transformation()
         sampled_indices= self.add_non_causal_snps_samples_randomly(total_samples, causal_snps_indices)
 
-        # self.cache[index] = {
-        #     'input': self.geno_data_reordered,
-        #     'labels':self.labels,
-        #     'causal_indices': causal_snps_indices,
-        #     'sampled_indicies': sampled_indices,
-        #     'population': mds_data,
-        # }
-
         return { 
                          'input':self.geno_data_reordered[sampled_indices,:], 
                          'labels': self.labels[sampled_indices],
@@ -59,19 +51,16 @@ class SimulationDataReader:
         causal_file =  f'{self.base_path}{index}{self.SUFFIX_CAUSAL}'
         pheno_file = f'{self.base_path}{index}{self.SUFFIX_EMMA_PHENO}'
 
-        self.geno_data_pd = pd.read_csv(emma_geno_file,index_col=None,header=None,sep='\t').fillna(-1)
-        self.causal_snp_data_pd = pd.read_csv(causal_file,index_col=None,header=None,sep='\t')
-        self.pheno_data_pd = pd.read_csv(pheno_file,index_col=None,header=None,sep='\t')
+        self.geno_data_np = pd.read_csv(emma_geno_file,index_col=None,header=None,sep='\t').fillna(-1).to_numpy()
+        self.causal_snp_data_np = pd.read_csv(causal_file,index_col=None,header=None,sep='\t').to_numpy()
+        self.pheno_data_np = pd.read_csv(pheno_file,index_col=None,header=None,sep='\t').to_numpy()
 
-        self.geno_data_np = self.geno_data_pd.to_numpy()
-        self.causal_snp_data_np = self.causal_snp_data_pd.to_numpy()
-        self.pheno_data_np = self.pheno_data_pd.to_numpy()
 
 
     def sort_phenotype(self):
         if self.pheno_data_np is not None and self.pheno_data_np.size > 0 :
             self.phone_arg_sorted = np.argsort(self.pheno_data_np).squeeze()
-            self.pheno_data_sorted = np.sort(self.pheno_data_np)
+            # self.pheno_data_sorted = np.sort(self.pheno_data_np)
 
     def sort_causal_snps(self):
         if self.causal_snp_data_np is not None and self.causal_snp_data_np.size > 0 :
