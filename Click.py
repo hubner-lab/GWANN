@@ -1,19 +1,17 @@
 import click
+import os
+os.environ['TF_CPP_MIN_LOG_LEVEL'] = '3'
 from Simulate import Simulate
-# from train import Train
-# from train2 import Train
-from train3 import Train
-#from run import Run
+from train5 import Train
 from run2 import Run
 from utilities import json_get, json_update
 import resource
 from const import SIMULATIONS, LOGGER_DIR
 import datetime
 from mylogger import Logger
-import os
 import time
 import resource
-import logging
+
 
 def log_resource_usage(start_time, logger, label=""):
     end_time = time.time()
@@ -40,6 +38,7 @@ class CLIManager:
         """
         self.cli = click.Group()
 
+
     @staticmethod
     @click.command()
     @click.option('-v', '--vcf', 'vcf', required=True, help='path to the VCF file')
@@ -48,13 +47,15 @@ class CLIManager:
     @click.option('--model','model',default=None,help="path to the network model generated in the training step")
     @click.option('--output','output_path',default="results/GWAS",help="prefix of output plot and causative SNPs indexes in the VCF")
     @click.option('--cpu/;','cpu',default=False,required=False,help="force on cpu")
+    @click.option('-func', '--f', 'func', default="", type=str, help="The name of the function to modify the output")
     def run(
         vcf: str,
         pheno_path:str,
         trait:str,
         model:str,
         output_path:str,
-        cpu:bool
+        cpu:bool,
+        func:str
         )-> None:
         """Run GWANN analysis.
 
@@ -77,9 +78,10 @@ class CLIManager:
         LOGGER_FILE = "run"
         os.environ['LOGGER'] = f'{LOGGER_DIR}/{LOGGER_FILE}_{datetime.datetime.now().strftime("%Y-%m-%d_%H-%M-%S")}.log'
         Logger(f'Message:', f"{os.environ['LOGGER']}").debug(f"Running GWANN analysis with VCF: {vcf}, phenotype path: {pheno_path}, trait: {trait}, model: {modelPath}, output path: {output_path}")
-        Run(vcf, pheno_path, trait, modelPath, output_path, cpu).start()
+        Run(vcf, pheno_path, trait, modelPath, output_path, cpu, func).start()
         log_resource_usage(start_time,Logger(f'Message:', f"{os.environ['LOGGER']}"),"Run")
         pass
+
 
     @staticmethod
     @click.command()
@@ -128,6 +130,7 @@ class CLIManager:
         Logger(f'Message:', f"{os.environ['LOGGER']}").debug(f"Simulating {n_sim} populations with {pop} SNPs, {subpop} subpopulations, {n_samples} samples, {n_snps} causal SNPs, MAF: {maf}, missing data: {miss}, equal variance: {equal}")
         Simulate(pop, subpop, n_samples, n_sim, n_snps, maf, miss, equal, debug, delete).simulate()
         log_resource_usage(start_time,Logger(f'Message:', f"{os.environ['LOGGER']}"), "Simulate")
+
 
     @staticmethod
     @click.command()
@@ -192,14 +195,17 @@ class CLIManager:
         self.cli.add_command(self.simulate)
         self.cli.add_command(self.train)
 
+
     def start(self):
         """Run the CLI application."""
         self.register_commands()
         self.cli()
 
+
     def memory_limit(self):
         soft, hard = resource.getrlimit(resource.RLIMIT_AS)
         resource.setrlimit(resource.RLIMIT_AS, (self.get_memory() * 1024 // 2, hard))
+
 
     def get_memory(self):
         with open('/proc/meminfo', 'r') as mem:

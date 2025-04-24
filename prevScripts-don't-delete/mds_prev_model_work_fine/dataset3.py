@@ -19,7 +19,7 @@ def loader_helper(simPath: str, causalSamples: int, columns: int, simIndex: int)
         )
         return None
 
-    # Determine image dimensions
+
     individuals = simData['input'].shape[1]
     rows = individuals // columns
     genomeImage = GenomeImage(rows, columns)
