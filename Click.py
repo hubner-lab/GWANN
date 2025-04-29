@@ -3,7 +3,7 @@ import os
 os.environ['TF_CPP_MIN_LOG_LEVEL'] = '3'
 from Simulate import Simulate
 from train5 import Train
-from run2 import Run
+from run import Run
 from utilities import json_get, json_update
 import resource
 from const import SIMULATIONS, LOGGER_DIR

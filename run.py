@@ -2,34 +2,39 @@ import numpy as np
 import pandas as pd
 from pathlib import Path
 from sklearn.manifold import MDS
-import matplotlib.pyplot as plt
-import tensorflow as tf
 from tensorflow.keras.models import load_model
-from genomeToImage import GenomeImage
-from utilities import json_get
+from utilities import json_get, createImages
 from mylogger import Logger
 import os 
 from scipy.special import logit
 from const import VCF_DATA_DIR
+import numpy as np
+import plotly.graph_objects as go
 
-def createImages(columns, data, sim_indivduals):
-    X_list = []
-    individuals = data.shape[1]
-    if individuals  < sim_indivduals:
-        pad = np.zeros((data.shape[0], sim_indivduals - individuals))
-        data = np.concatenate((data, pad), axis=1)
-    rows = int(sim_indivduals / columns)
-    genomeImage = GenomeImage(rows, columns)
-    for sample in data:
-        image = genomeImage.transform_to_image(sample)
-        X_list.append(image)  # Append image to the list
-    X = tf.convert_to_tensor(X_list, dtype=tf.float32)  # Adjust dtype if needed
-    return X
+
+def tanh_map(output, scale=10):
+    return np.tanh(scale * (output - 0.5))
+
+
+def logit_map(output):
+        EPSILON = 0.1
+        clipoutput = np.clip(output, EPSILON, 1 - EPSILON)
+        return logit(clipoutput)
+
+
+def log_map(output):
+    EPSILON  = 0.0001
+    clipoutput = np.clip(output, EPSILON, 1 - EPSILON)  # to avoid log(1-1) = log(0)
+    res =  -np.log(1-clipoutput)
+    resNorm = res / np.max(res) # normalize to 0-1
+    SCALE = 100
+    return  SCALE* resNorm
+
 
 
 
 class Run:
-    def __init__(self,vcf, pheno_path, trait,model, output_path, cpu):
+    def __init__(self,vcf, pheno_path, trait,model, output_path, cpu, func):
         self.vcf = vcf
         self.pheno_path = pheno_path
         self.trait = trait
@@ -38,7 +43,8 @@ class Run:
         self.cpu = cpu
         self.width = json_get("width")
         self.sim_indivduals = json_get("samples")
-
+        self.logger = Logger(f'Message:', f"{os.environ['LOGGER']}")
+        self.func = func
 
 
     def load_and_parse_data(self):
@@ -69,8 +75,25 @@ class Run:
         tmp_vcf[np.where(tmp_vcf == 0.5)] = 0
         return tmp_vcf
     
-
-    def load_model_and_predict(self, sorted_vcf):
+    def get_output_modified(self,output, funcName = ""):
+        """
+        Get the output of a function by modifying the function name.
+        Args:
+            funcName (str): The name of the function to modify.
+        Returns:
+            str: The modified function name.
+        """
+        if funcName == "tan":
+            return tanh_map(output)
+        elif funcName == "logit":
+            return logit_map(output)
+        elif funcName == "log":
+            return log_map(output)
+        else:
+            SCALE = 100
+            return SCALE* output
+        
+    def load_model_and_predict(self, sorted_vcf, funcName=""):
         
         # Reshape input to match model expectatons
 
@@ -85,54 +108,55 @@ class Run:
 
         output = predictions.flatten() 
 
-        EPSILON = 0.1
-        clipoutput = np.clip(output, EPSILON, 1 - EPSILON)  # log-odds
-        logitoutput = logit(clipoutput)
-
-        # sigmoid_th = 0.5 
-        # print(f"Thresholded predictions: {100 * (np.sum(output > sigmoid_th) / output.shape[0]):.2f}%")
-
-        df = pd.DataFrame({"value": predictions.flatten() }, index=range(len(output)))
+        df = pd.DataFrame({"value": predictions.flatten()}, index=range(len(output)))
         df.to_csv(f"{self.output_path}.csv")
+        self.logger.info(f"Output saved to {self.output_path}.csv")
 
-        return logitoutput
+        return  self.get_output_modified(output, funcName)
 
-    def plot_data(self, chrom, logitoutput):
+
+    def plot_data(self, chrom, output):
         chrom_arr = np.unique(chrom)
-        chrom_labels =  chrom_arr[ np.argsort([int(x[2:]) for x in chrom_arr])] 
+        chrom_labels = chrom_arr[np.argsort([int(x[2:]) for x in chrom_arr])]
 
-        Logger(f'Message:', os.environ['LOGGER']).info(f"Generating scatter plot...")
-        plt.figure(figsize=(12, 5))
+        self.logger.info(f"Generating scatter plot with Plotly...")
 
         x_ticks = []
         x_tick_labels = []
         current_position = 0
+        fig = go.Figure()
 
         for i, chr_label in enumerate(chrom_labels):
             chr_indices = np.where(chrom == chr_label)[0]
-            chr_outputs = logitoutput[chr_indices]
+            chr_outputs = output[chr_indices]
 
             x_chr = np.arange(current_position, current_position + len(chr_indices))
-            
+
             # Alternate color: even index = blue, odd index = black
             color = 'blue' if i % 2 == 0 else 'red'
 
-            plt.scatter(x_chr, chr_outputs, s=3, alpha=0.6, color=color, label=chr_label)
+            fig.add_trace(go.Scattergl(
+                x=x_chr,
+                y=chr_outputs,
+                mode='markers',
+                name=chr_label,
+                marker=dict(size=3, opacity=0.6, color=color)
+            ))
 
             x_ticks.append(current_position + len(chr_indices) // 2)
             x_tick_labels.append(chr_label)
 
             current_position += len(chr_indices)
 
-        plt.xticks(x_ticks, x_tick_labels, rotation=45)
-        plt.xlabel("Chromosome")
-        plt.ylabel("Prediction Logit Score")
-        plt.title("Prediction of SNPs associated with the trait.")
-        plt.ylim(0, max(logitoutput))
-        plt.tight_layout()
-        plt.legend(markerscale=6, bbox_to_anchor=(1.02, 1), loc='upper left', fontsize='small')
-        plt.savefig(f"{self.output_path}.png")
-        Logger(f'Message:', os.environ['LOGGER']).info(f"Scatter plot saved to {self.output_path}.png")
+        fig.update_layout(
+            title="Prediction of SNPs associated with the trait.",
+            xaxis=dict(tickmode='array', tickvals=x_ticks, ticktext=x_tick_labels, title="Chromosome"),
+            yaxis=dict(title="Prediction(%)"),
+            showlegend=True
+        )
+
+        fig.write_html(f"{self.output_path}.html")
+        self.logger.info(f"Scatter plot saved to {self.output_path}.html")
 
     def start(self):
         """Run on real data using a trained TensorFlow model"""
@@ -141,12 +165,6 @@ class Run:
         vcf_data, vcf_samples, chrom, pheno = self.load_and_parse_data()
 
         tmp_vcf = self.calc_avg_vcf(vcf_data)
-
-        # print('Running MDS for population structure...')
-        # embedding = MDS(n_components=1, random_state=0)
-        # mds_data = embedding.fit_transform(tmp_vcf.T)
-
-        # pop = np.expand_dims(mds_data, axis=-1)  # Ensure correct shape for the model
 
         _, index_samples, index_samples_pheno = np.intersect1d(vcf_samples, pheno["sample"], return_indices=True)
         final_vcf = tmp_vcf
@@ -158,9 +176,9 @@ class Run:
         sorted_vcf = final_vcf[:, sorted_axes]
 
 
-        logitoutput = self.load_model_and_predict(sorted_vcf)
+        output = self.load_model_and_predict(sorted_vcf, self.func)
 
-        self.plot_data(chrom, logitoutput)
+        self.plot_data(chrom, output)
 
 
 

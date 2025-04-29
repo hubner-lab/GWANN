@@ -1,8 +1,11 @@
 ## Table of contents
-* [General info](#general-info)
-* [Dependencies](#Dependencies)
-* [How to start](#How-to-start)
-* [Usage](#usage)
+- [Table of contents](#table-of-contents)
+- [General info](#general-info)
+- [Dependencies](#dependencies)
+- [How to start](#how-to-start)
+- [Example](#example)
+- [Usage](#usage)
+- [Net](#net)
 
 ## General info
 GWANN is a deep learning algorithm implementing a convolutinal nerual network (CNN) to identify genetic variation that is associated with a trait of intrest. 
@@ -48,6 +51,10 @@ $ python3 GWANN.py train -e 500 -S 30 -r 0.7 -w 15 --path simulation/data/ --ver
 # using the model generated in previous step and output results to output.csv and output.png
 $ python3 GWANN.py run --vcf INPUT.vcf.gz --pheno INPUT.pheno -t Plant_Height --model models/net-accuracy.pt --output output 
 
+
+# - Batch size: 16, Number of samples: 10, Data path: './simulation/data/', Epochs: 100
+# - Data separation rate: 0.2 (80% training, 20% testing), Image width: 20, Model name: 'model32'
+$ --batch 128 -S 20 --path ./simulation/data/ -e 100 -r 0.2 --width 20 --verbose -M model32 
 ```
 
 ## Usage
