@@ -2,8 +2,10 @@ import click
 import os
 os.environ['TF_CPP_MIN_LOG_LEVEL'] = '3'
 from Simulate import Simulate
-from train5 import Train
-from run import Run
+# from train6 import Train
+from mds1_train import Train
+# from run3 import Run
+from mds1_run import Run
 from utilities import json_get, json_update
 import resource
 from const import SIMULATIONS, LOGGER_DIR
@@ -47,7 +49,8 @@ class CLIManager:
     @click.option('--model','model',default=None,help="path to the network model generated in the training step")
     @click.option('--output','output_path',default="results/GWAS",help="prefix of output plot and causative SNPs indexes in the VCF")
     @click.option('--cpu/;','cpu',default=False,required=False,help="force on cpu")
-    @click.option('-func', '--f', 'func', default="", type=str, help="The name of the function to modify the output")
+    @click.option('--transform', '--f', 'func', default="", type=str, help="The name of the function to modify the output")
+    @click.option('--threshold', '--th', 'th', default=0, type=int, help="Plot resolution begin from this threshold (% Prediction)") 
     def run(
         vcf: str,
         pheno_path:str,
@@ -55,7 +58,8 @@ class CLIManager:
         model:str,
         output_path:str,
         cpu:bool,
-        func:str
+        func:str,
+        th:int 
         )-> None:
         """Run GWANN analysis.
 
@@ -77,8 +81,8 @@ class CLIManager:
         json_update("current_command", 'run')
         LOGGER_FILE = "run"
         os.environ['LOGGER'] = f'{LOGGER_DIR}/{LOGGER_FILE}_{datetime.datetime.now().strftime("%Y-%m-%d_%H-%M-%S")}.log'
-        Logger(f'Message:', f"{os.environ['LOGGER']}").debug(f"Running GWANN analysis with VCF: {vcf}, phenotype path: {pheno_path}, trait: {trait}, model: {modelPath}, output path: {output_path}")
-        Run(vcf, pheno_path, trait, modelPath, output_path, cpu, func).start()
+        Logger(f'Message:', f"{os.environ['LOGGER']}").debug(f"Running GWANN analysis with VCF: {vcf}, phenotype path: {pheno_path}, trait: {trait}, model: {modelPath}, output path: {output_path}, threshold: {th}, function: {func}")
+        Run(vcf, pheno_path, trait, modelPath, output_path, cpu, func, th).start()
         log_resource_usage(start_time,Logger(f'Message:', f"{os.environ['LOGGER']}"),"Run")
         pass
 

@@ -64,6 +64,7 @@ class Dataset:
         self.X: tf.Tensor = None
         self.y: tf.Tensor = None
         self.pop: tf.Tensor = None
+        self.logger = Logger('Message:', os.environ['LOGGER'])
 
     def load_data(self):
         """
@@ -71,7 +72,7 @@ class Dataset:
         and convert to TensorFlow tensors.
         """
         cpus = os.cpu_count() or 4
-        Logger('Message:', os.environ['LOGGER']).info(
+        self.logger.info(
             f"Spawning {cpus} worker processes for data loading."
         )
 
@@ -99,12 +100,12 @@ class Dataset:
                 try:
                     result = future.result(timeout=self.timeout)
                 except TimeoutError:
-                    Logger('Error:', os.environ['LOGGER']).error(
+                    self.logger.error(
                         f"[sim {sim_idx}] timed out after {self.timeout}s"
                     )
                     continue
                 except Exception as e:
-                    Logger('Error:', os.environ['LOGGER']).error(
+                    self.logger.error(
                         f"[sim {sim_idx}] failed: {e}"
                     )
                     continue

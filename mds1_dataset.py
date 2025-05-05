@@ -1,11 +1,10 @@
-from simulationloader2 import SimulationDataReader
+from mds1_simulationloader import SimulationDataReader
 from genomeToImage import GenomeImage
 import tensorflow as tf
 from mylogger import Logger
 import os
 from concurrent.futures import ProcessPoolExecutor, as_completed, TimeoutError
 from tqdm import tqdm
-from utilities import json_update
 
 def loader_helper(simPath: str, causalSamples: int, columns: int, simIndex: int):
     """
@@ -15,7 +14,7 @@ def loader_helper(simPath: str, causalSamples: int, columns: int, simIndex: int)
     try:
         simData = SimulationDataReader(simPath).run(simIndex, causalSamples)
     except Exception as e:
-        Logger(f'Message:', f"{os.environ['LOGGER']}").error(
+        Logger('Error:', os.environ['LOGGER']).error(
             f"[sim {simIndex}] failed to load: {e}"
         )
         return None
@@ -25,21 +24,23 @@ def loader_helper(simPath: str, causalSamples: int, columns: int, simIndex: int)
     rows = individuals // columns
     genomeImage = GenomeImage(rows, columns)
 
-    X_local, y_local= [], []
+    X_local, y_local, pop_local = [], [], []
+    mds_vector = simData['population']
 
     for idx, sample in enumerate(simData['input']):
         try:
             img = genomeImage.transform_to_image(sample)
         except Exception as e:
-            Logger('Message:', os.environ['LOGGER']).error(
+            Logger('Error:', os.environ['LOGGER']).error(
                 f"[sim {simIndex}, sample {idx}] transform error: {e}"
             )
             continue
 
         X_local.append(img)
         y_local.append(int(simData['labels'][idx]))
+        pop_local.append(mds_vector)
 
-    return X_local, y_local
+    return X_local, y_local, pop_local
 
 
 class Dataset:
@@ -53,17 +54,16 @@ class Dataset:
         simPath: str = None,
         timeout: float = 30.0,
     ):
-
         self.total_simulations = total_simulations
         self.causalSamples = causalSamples
         self.columns = columns
         self.simPath = simPath or self.BASEPATH
         self.timeout = timeout
 
-        json_update("width", self.columns)
+        # final tensors
         self.X: tf.Tensor = None
         self.y: tf.Tensor = None
-
+        self.pop: tf.Tensor = None
         self.logger = Logger('Message:', os.environ['LOGGER'])
 
     def load_data(self):
@@ -76,7 +76,7 @@ class Dataset:
             f"Spawning {cpus} worker processes for data loading."
         )
 
-        X_all, y_all = [], []
+        X_all, y_all, pop_all = [], [], []
 
         with ProcessPoolExecutor(max_workers=cpus) as executor:
             # submit all sims
@@ -111,15 +111,17 @@ class Dataset:
                     continue
 
                 if result:
-                    x_part, y_part = result
+                    x_part, y_part, pop_part = result
                     X_all.extend(x_part)
                     y_all.extend(y_part)
+                    pop_all.extend(pop_part)
 
-        Logger('Message:', os.environ['LOGGER']).info(
+        self.logger.info(
             "All simulations loaded; converting lists to tensors."
         )
         self.X = tf.convert_to_tensor(X_all, dtype=tf.float32)
         self.y = tf.convert_to_tensor(y_all, dtype=tf.int32)
+        self.pop = tf.convert_to_tensor(pop_all, dtype=tf.float32)
         self.logger.info("Tensors ready.")
         self.logger.debug(f"Total samples: {len(self.X)}")
         self.logger.debug(f"Total labels: {len(self.y)}")
@@ -128,7 +130,6 @@ class Dataset:
         self.logger.debug(f"Total true labels: {total_causal}")
         self.logger.debug(f"Total false labels: {total_non_causal_mds_include}")
         self.logger.debug(f"Sampling rate: { int(total_causal / total_causal)}:{int(total_non_causal_mds_include/total_causal)}")
-
 
 
 
@@ -148,5 +149,3 @@ if __name__ == '__main__':
     print("  X:", dataset.X.shape)
     print("  y:", dataset.y.shape)
     print("  pop:", dataset.pop.shape)
-
- 

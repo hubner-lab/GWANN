@@ -76,7 +76,7 @@ class Simulate:
         self.logger.info(f"Pool of workers created with {cpus} CPU cores.")
         self.logger.info(f"Generating commands...")
         genome_command, phenosim_command, samples_str = self._generate_commands()
-        self.logger.info(f"Commands generated with the following parameters: genome_command: {genome_command}\nphenosim_command: {phenosim_command}")
+        self.logger.info(f"Commands generated with the following parameters:\ngenome_command: {genome_command}\nphenosim_command: {phenosim_command}")
 
         try:
             self._debug_message1(cpus,samples_str)
