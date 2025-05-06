@@ -70,6 +70,7 @@ class Train:
         )
 
         model.fit(X_train, y_train, 
+                validation_data=(X_test, y_test),
                   epochs=self.epochs, 
                   batch_size=self.batch_size, 
                   callbacks=[checkpoint_cb],

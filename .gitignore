@@ -27,3 +27,7 @@ genome
 logs/
 
 Temp/
+
+mds*/
+
+prevScripts_dont_delete/

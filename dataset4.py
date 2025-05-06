@@ -6,6 +6,8 @@ import os
 from concurrent.futures import ProcessPoolExecutor, as_completed, TimeoutError
 from tqdm import tqdm
 from utilities import json_update
+import multiprocessing
+multiprocessing.set_start_method('spawn', force=True)
 
 def loader_helper(simPath: str, causalSamples: int, columns: int, simIndex: int):
     """
@@ -112,6 +114,7 @@ class Dataset:
 
                 if result:
                     x_part, y_part = result
+                    # self.logger.info(f"[sim {sim_idx}] loaded {len(x_part)} samples.")
                     X_all.extend(x_part)
                     y_all.extend(y_part)
 
