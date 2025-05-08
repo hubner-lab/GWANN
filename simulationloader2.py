@@ -43,11 +43,10 @@ class SimulationDataReader:
         self.apply_labeling(causal_snps_indices, is_sigmoid=True)
         self.mds_data = self.apply_mds_transformation()
         self.sort_mds()
-        self.reorder_geno_data_according_to_MDS_sorted_order(causal_snps_indices)
-        sampled_indices= self.add_non_causal_snps_samples_randomly(total_samples, causal_snps_indices)
-
-        labels = np.concatenate( ( self.labels[sampled_indices], np.zeros( (len(causal_snps_indices),) ) ), axis=0)
-        inputMat = np.concatenate((self.geno_data_reordered_pheno[sampled_indices,:], self.geno_data_reordered_mds), axis=0) 
+        all_sampled_indices, non_causal_snps_indices= self.add_non_causal_snps_samples_randomly(total_samples, causal_snps_indices)
+        self.reorder_geno_data_according_to_MDS_sorted_order(all_sampled_indices)
+        labels = np.concatenate( ( self.labels[all_sampled_indices], np.zeros( (len(all_sampled_indices),) ) ), axis=0) # add TN Labels 
+        inputMat = np.concatenate((self.geno_data_reordered_pheno[all_sampled_indices,:], self.geno_data_reordered_mds), axis=0) # add TN SNPs, The same None-causal-snps picked randomly reordered according to the sorting args of the mds 
         return { 
                          'input':inputMat, 
                          'labels': labels,
@@ -59,17 +58,19 @@ class SimulationDataReader:
             self.mds_data_sorted = self.mds_data[:, sorted_indices]
             self.mds_arg_sorted = sorted_indices
 
-    def reorder_geno_data_according_to_MDS_sorted_order(self, causal_snps_indices):
+    def reorder_geno_data_according_to_MDS_sorted_order(self, snps_indices):
         if self.mds_data is not None and self.mds_data.size > 0 :
-            temp = self.geno_data_np[causal_snps_indices,:]
-            self.geno_data_reordered_mds  = temp[:, self.mds_arg_sorted]
+            temp = self.geno_data_np[snps_indices,:] # Take the specific snps  sub-Matrix 
+            self.geno_data_reordered_mds  = temp[:, self.mds_arg_sorted] # reorder sub-Matrix columns according to the mds sorted indices 
 
     def load(self, index):
         emma_geno_file  = f'{self.base_path}{index}{self.SUFFIX_EMMA_GENO}'
         causal_file =  f'{self.base_path}{index}{self.SUFFIX_CAUSAL}'
         pheno_file = f'{self.base_path}{index}{self.SUFFIX_EMMA_PHENO}'
 
-        self.geno_data_np = pd.read_csv(emma_geno_file,index_col=None,header=None,sep='\t').fillna(-1).to_numpy()
+
+        self.geno_data_pd = pd.read_csv(emma_geno_file,index_col=None,header=None,sep='\t')
+        self.geno_data_np = self.geno_data_pd.fillna(-1).to_numpy()
         self.causal_snp_data_np = pd.read_csv(causal_file,index_col=None,header=None,sep='\t').to_numpy()
         self.pheno_data_np = pd.read_csv(pheno_file,index_col=None,header=None,sep='\t').to_numpy()
 
@@ -105,20 +106,23 @@ class SimulationDataReader:
         return (self.causal_sorted[:,self.COLUMN]).astype(int)
     
     def add_non_causal_snps_samples_randomly(self, total_samples, causal_snps_indices):
-        n = total_samples - len(causal_snps_indices)
 
-        sampled_indices = np.random.choice(np.setdiff1d(range(self.geno_data_reordered_pheno.shape[0]),causal_snps_indices), n, replace=False)  
+        n = total_samples - len(causal_snps_indices) 
 
-        sampled_indices = np.concatenate((sampled_indices,causal_snps_indices))
+        sampled_indices_non_causal_snps = np.random.choice(np.setdiff1d(range(self.geno_data_reordered_pheno.shape[0]),causal_snps_indices), n, replace=False)  
 
-        np.random.shuffle(sampled_indices)
+        all_sampled_indices = np.concatenate((sampled_indices_non_causal_snps,causal_snps_indices))
 
-        return sampled_indices 
+        np.random.shuffle(all_sampled_indices)
+
+        return all_sampled_indices, sampled_indices_non_causal_snps
     
         
     def apply_mds_transformation(self):
         embedding = MDS(n_components=1, random_state=0, normalized_stress="auto")
         return embedding.fit_transform(self.geno_data_reordered_pheno.T).T
+    
+
 
 if __name__ == "__main__":
     data_reader = SimulationDataReader('./simulation/data/')

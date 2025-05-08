@@ -9,13 +9,13 @@ from utilities import json_update
 import multiprocessing
 multiprocessing.set_start_method('spawn', force=True)
 
-def loader_helper(simPath: str, causalSamples: int, columns: int, simIndex: int):
+def loader_helper(simPath: str, sampledSitesIncludeCausals: int, columns: int, simIndex: int):
     """
     Load one simulation, convert each genome sample into a 2D image,
     collect its labels and population vector.
     """
     try:
-        simData = SimulationDataReader(simPath).run(simIndex, causalSamples)
+        simData = SimulationDataReader(simPath).run(simIndex, sampledSitesIncludeCausals)
     except Exception as e:
         Logger(f'Message:', f"{os.environ['LOGGER']}").error(
             f"[sim {simIndex}] failed to load: {e}"
@@ -50,14 +50,14 @@ class Dataset:
     def __init__(
         self,
         total_simulations: int,
-        causalSamples: int,
+        sampledSitesIncludeCausals: int,
         columns: int,
         simPath: str = None,
         timeout: float = 30.0,
     ):
 
         self.total_simulations = total_simulations
-        self.causalSamples = causalSamples
+        self.sampledSitesIncludeCausals = sampledSitesIncludeCausals
         self.columns = columns
         self.simPath = simPath or self.BASEPATH
         self.timeout = timeout
@@ -86,7 +86,7 @@ class Dataset:
                 executor.submit(
                     loader_helper,
                     self.simPath,
-                    self.causalSamples,
+                    self.sampledSitesIncludeCausals,
                     self.columns,
                     idx
                 ): idx
@@ -139,7 +139,7 @@ if __name__ == '__main__':
     # Example usage
     dataset = Dataset(
         total_simulations=100,
-        causalSamples=4,
+        sampledSitesIncludeCausals=4,
         columns=20,
         simPath=None,
         timeout=20.0

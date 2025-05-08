@@ -8,13 +8,13 @@ from utilities import json_update
 from net3 import ModelBuilder  # assuming net3 is updated with softmax support
 from tensorflow.keras.utils import to_categorical
 from tensorflow.keras.callbacks import ModelCheckpoint
-
+from tensorflow.keras.callbacks import EarlyStopping
 class Train:
-    def __init__(self, model_name:str, total_simulations:int, CausalSamples: int, columns:int,
+    def __init__(self, model_name:str, total_simulations:int, sampledSitesIncludeCausals: int, columns:int,
                  batch_size:int, epochs:int, simPath: str = "./simulation/data/", test_ratio:float = 0.2):
 
         self.model_name = model_name
-        self.dataset = Dataset(total_simulations, CausalSamples, columns, simPath)
+        self.dataset = Dataset(total_simulations, sampledSitesIncludeCausals, columns, simPath)
         self.batch_size = batch_size
         self.epochs = epochs
         self.test_ratio = test_ratio
