@@ -9,14 +9,13 @@ from net3 import ModelBuilder  # assuming net3 is updated with softmax support
 from tensorflow.keras.utils import to_categorical
 from tensorflow.keras.callbacks import ModelCheckpoint
 from tensorflow.keras.callbacks import EarlyStopping
-from sklearn.metrics import precision_score, recall_score, f1_score, average_precision_score
 
 class Train:
     def __init__(self, model_name:str, total_simulations:int, sampledSitesIncludeCausals: int, columns:int,
-                 batch_size:int, epochs:int,mds:bool, simPath: str = "./simulation/data/", test_ratio:float = 0.2):
+                 batch_size:int, epochs:int, simPath: str = "./simulation/data/", test_ratio:float = 0.2):
 
         self.model_name = model_name
-        self.dataset = Dataset(total_simulations, sampledSitesIncludeCausals,columns,mds, simPath)
+        self.dataset = Dataset(total_simulations, sampledSitesIncludeCausals, columns, simPath)
         self.batch_size = batch_size
         self.epochs = epochs
         self.test_ratio = test_ratio
@@ -63,46 +62,58 @@ class Train:
 
         self.logger.info("Training model...")
 
-        checkpoint_cb = ModelCheckpoint(
-            filepath=f"{MODEL_PATH_TENSOR_DIR}/{self.model_name}_best.h5",
-            save_best_only=True,
-            monitor='val_loss',  # or 'val_accuracy'
-            mode='min',          # or 'max' for accuracy
-            verbose=1
-        )
+        patience = 11  # epochs with no improvement before restart
+        max_retries = 100  # how many times to restart training
 
-        model.fit(X_train, y_train, 
+        retries = 0
+        best_val_loss = float('inf')
+
+        while retries <= max_retries:
+            checkpoint_cb = ModelCheckpoint(
+                filepath=f"{MODEL_PATH_TENSOR_DIR}/{self.model_name}.h5",
+                save_best_only=True,
+                monitor='val_loss',
+                mode='min',
+                verbose=1
+            )
+
+            early_stop_cb = EarlyStopping(
+                monitor='val_loss',
+                patience=patience,
+                restore_best_weights=True,
+                mode='min',
+                verbose=1
+            )
+
+            history = model.fit(
+                X_train, y_train,
                 validation_data=(X_test, y_test),
-                  epochs=self.epochs, 
-                  batch_size=self.batch_size, 
-                  callbacks=[checkpoint_cb],
-                  verbose=1)
+                epochs=self.epochs,
+                batch_size=self.batch_size,
+                callbacks=[checkpoint_cb, early_stop_cb],
+                verbose=1
+            )
+
+            val_loss = min(history.history['val_loss'])
+
+            if val_loss < best_val_loss:
+                best_val_loss = val_loss
+                break  # improvement found, exit loop
+            else:
+                retries += 1
+                self.logger.warning(f"No improvement in val_loss. Restarting training... Attempt {retries}/{max_retries}")
+                model = modelBuilder.model_summary()  # reinitialize model
+                model.compile(optimizer='rmsprop', loss='categorical_crossentropy', metrics=['accuracy'])
+
 
         json_update("model_name", f"{MODEL_PATH_TENSOR_DIR}/{self.model_name}.h5")
         self.logger.info(f"Model name updated to {MODEL_PATH_TENSOR_DIR}/{self.model_name}.h5")
         model.save(f"{MODEL_PATH_TENSOR_DIR}/{self.model_name}.h5")
 
-
         test_loss, test_acc = model.evaluate(X_test, y_test)
         self.logger.info(f'Test loss: {test_loss}')
         self.logger.info(f'Test accuracy: {test_acc}')
-
-        # Predict and calculate PR metrics
-        y_pred_probs = model.predict(X_test)
-        y_pred_labels = np.argmax(y_pred_probs, axis=1)
-        y_test_labels = np.argmax(y_test, axis=1)
-
-        precision = precision_score(y_test_labels, y_pred_labels)
-        recall = recall_score(y_test_labels, y_pred_labels)
-        f1 = f1_score(y_test_labels, y_pred_labels)
-        auc_pr = average_precision_score(y_test[:, 1], y_pred_probs[:, 1])
-
-        self.logger.info(f'Precision: {precision:.4f}')
-        self.logger.info(f'Recall: {recall:.4f}')
-        self.logger.info(f'F1-score: {f1:.4f}')
-        self.logger.info(f'AUC-PR (Precision-Recall): {auc_pr:.4f}')
         self.logger.info("Model training completed successfully.")
-
 
 if __name__ == '__main__':
     total_simulations = 1000

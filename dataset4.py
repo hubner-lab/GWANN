@@ -1,4 +1,5 @@
-from simulationloader2 import SimulationDataReader
+from simulationloader2 import SimulationDataReader # with mds Sariel description (Add None-causal as TN)
+# from simulationloader import SimulationDataReader  # no mds 
 from genomeToImage import GenomeImage
 import tensorflow as tf
 from mylogger import Logger
@@ -9,13 +10,13 @@ from utilities import json_update
 import multiprocessing
 multiprocessing.set_start_method('spawn', force=True)
 
-def loader_helper(simPath: str, sampledSitesIncludeCausals: int, columns: int, simIndex: int):
+def loader_helper(simPath: str, sampledSitesIncludeCausals: int, columns: int, simIndex: int, mds:bool):
     """
     Load one simulation, convert each genome sample into a 2D image,
     collect its labels and population vector.
     """
     try:
-        simData = SimulationDataReader(simPath).run(simIndex, sampledSitesIncludeCausals)
+        simData = SimulationDataReader(simPath, mds).run(simIndex, sampledSitesIncludeCausals)
     except Exception as e:
         Logger(f'Message:', f"{os.environ['LOGGER']}").error(
             f"[sim {simIndex}] failed to load: {e}"
@@ -52,6 +53,7 @@ class Dataset:
         total_simulations: int,
         sampledSitesIncludeCausals: int,
         columns: int,
+        mds:bool,
         simPath: str = None,
         timeout: float = 30.0,
     ):
@@ -61,6 +63,7 @@ class Dataset:
         self.columns = columns
         self.simPath = simPath or self.BASEPATH
         self.timeout = timeout
+        self.mds = mds
 
         json_update("width", self.columns)
         self.X: tf.Tensor = None
@@ -79,7 +82,8 @@ class Dataset:
         )
 
         X_all, y_all = [], []
-
+        # loader_helper(self.simPath, self.sampledSitesIncludeCausals, self.columns, 0) # for debug
+        self.logger.debug(f"Running simulation with mds={self.mds}")
         with ProcessPoolExecutor(max_workers=cpus) as executor:
             # submit all sims
             futures = {
@@ -88,7 +92,8 @@ class Dataset:
                     self.simPath,
                     self.sampledSitesIncludeCausals,
                     self.columns,
-                    idx
+                    idx,
+                    self.mds
                 ): idx
                 for idx in range(self.total_simulations)
             }

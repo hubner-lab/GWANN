@@ -3,11 +3,9 @@ import os
 os.environ['TF_CPP_MIN_LOG_LEVEL'] = '3'
 
 from Simulate import Simulate
-from train6 import Train
-# from mds2_train import Train
+# from train6 import Train  
+from train11 import Train  # improved since data is extremely imbalanced
 from run3 import Run
-# from mds2_run import Run
-
 from utilities import json_get, json_update
 import resource
 from const import SIMULATIONS, LOGGER_DIR
@@ -16,6 +14,11 @@ from mylogger import Logger
 import time
 import resource
 
+
+
+# mds with vectors by nimrood 
+# from z_train4_mds_vectors import Train 
+# from z_run2_mds_vectors import Run 
 
 def log_resource_usage(start_time, logger, label=""):
     end_time = time.time()
@@ -147,9 +150,7 @@ class CLIManager:
     @click.option('-r', '--ratio', 'ratio', default=0.8, type=float, help="Train / eval ratio")
     @click.option('-w', '--width', 'width', default=15, type=int, help="Image width must be a divisor of the number of individuals")
     @click.option('--path', 'sim_path', required=True, type=str, help="Path to the simulated data")
-    @click.option('--verbose', 'debug', default=False, is_flag=True, help="Increase verbosity")
-    @click.option('--deterministic', 'deterministic', default=False, is_flag=True, help="Set for reproducibility")
-    @click.option('--cpu', 'cpu', default=False, is_flag=True, help="Force training on CPU")
+    @click.option('--mds', 'mds', default=False,is_flag=True, type=bool, help="Apply mds transformation on the phenotype matrix, add TN to avoid population structure")
     def train(
         model_name: str,
         epochs: int, 
@@ -157,10 +158,8 @@ class CLIManager:
         batch: int, 
         ratio: float, 
         width: int, 
-        sim_path: str, 
-        debug: bool, 
-        deterministic: bool, 
-        cpu: bool
+        sim_path: str,
+        mds,
     ) -> None:
         """Train the model for GWANN analysis.
 
@@ -185,9 +184,9 @@ class CLIManager:
         start_time = time.time()
         LOGGER_FILE = "train"
         os.environ['LOGGER'] = f'{LOGGER_DIR}/{LOGGER_FILE}_{datetime.datetime.now().strftime("%Y-%m-%d_%H-%M-%S")}.log'
-        Logger(f'Message:', f"{os.environ['LOGGER']}").debug(f"Training with {epochs} epochs, {n_snps} sampled SNPs, batch size {batch}, ratio {ratio}, width {width}, path {sim_path}, model name {model_name}")
+        Logger(f'Message:', f"{os.environ['LOGGER']}").debug(f"Training with {epochs} epochs, {n_snps} sampled SNPs, batch size {batch}, ratio {ratio}, width {width}, path {sim_path}, model name {model_name}, mds: {mds}")
         total_simulations = json_get(SIMULATIONS)
-        Train(model_name, total_simulations, n_snps, width, batch, epochs, sim_path, ratio ).run()
+        Train(model_name, total_simulations, n_snps, width, batch, epochs,mds, sim_path, ratio).run()
         log_resource_usage(start_time,Logger(f'Message:', f"{os.environ['LOGGER']}"), "Train")
         
 

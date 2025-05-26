@@ -150,7 +150,7 @@ class Run:
         fig.update_layout(
             title="Prediction of SNPs associated with the trait.",
             xaxis=dict(tickmode='array', tickvals=x_ticks, ticktext=x_tick_labels, title="Chromosome"),
-                yaxis=dict(title="Prediction(%)", range=[self.th, np.ceil(output)]),
+                yaxis=dict(title="Prediction(%)", range=[0, 100]),
             showlegend=True
         )
 
@@ -176,7 +176,9 @@ class Run:
 
 
         output = self.load_model_and_predict(sorted_vcf, self.func)
-
+        causal_snps = len(np.where(output/100 > 0.5))
+        percentage = causal_snps/len(output)
+        print(f'Causal SNPs(%):{100*percentage}')
         self.plot_data(chrom, output)
 
 
