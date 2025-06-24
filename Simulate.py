@@ -114,10 +114,10 @@ class Simulate:
         Generates a seeded population array with random integers added to each element.
 
         Returns:
-        np.ndarray: An array of integers where each element is a unique integer from 0 to pop-1 
+        np.ndarray: An array of integers where each element is a unique integer from 0 to number of simulations
                     with a random integer between LOWER_BOUND=1 and UPPER_BOUND=1000000 added to it.
         """
-        return np.array(list(range(self.SNPs))) + np.random.randint(LOWER_BOUND, UPPER_BOUND)
+        return np.array(list(range(self.n_sim))) + np.random.randint(LOWER_BOUND, UPPER_BOUND)
 
         
     def _generate_samples_str(self) -> str:
