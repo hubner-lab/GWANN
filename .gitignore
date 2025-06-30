@@ -40,3 +40,4 @@ script_runner.sh
 openImage.sh
 simulationloader.py
 simulationloader2.py
+simulation/phenosim 
