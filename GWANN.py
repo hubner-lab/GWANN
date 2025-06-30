@@ -52,7 +52,7 @@ class CLIManager:
     @click.option('--model','model',default=None,help="path to the network model generated in the training step")
     @click.option('--output','output_path',default="results/GWAS",help="prefix of output plot and causative SNPs indexes in the VCF")
     @click.option('--cpu/;','cpu',default=False,required=False,help="force on cpu")
-    @click.option('--transform', '--f', 'func', default="", type=str, help="The name of the function to modify the output")
+    @click.option('--transform', '--f', 'func', default="", type=str, help="The name of the function to modify the output (tanh_map, logit_map, log_map)")
     @click.option('--threshold', '--th', 'th', default=50, type=int, help="Plot resolution begin from this threshold (% Prediction)") 
     def run(
         vcf: str,
