@@ -33,7 +33,7 @@ source myenv/bin/activate
 ```
 # Go into the repository
 ```bash
-cd GWANN Batch-Performance
+cd GWANN
 ```
 # Temporary (Later will be removed)
 ```bash
