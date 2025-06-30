@@ -4,18 +4,14 @@ __pycache__/
 args/
 # Ignore config directories
 config*/
-# Ignore log history
-log_history/
 # Ignore specific directories
 ../GWANN_2/vcf_data/
 vcf_data/
 *.sh
 .vscode/
 genom
-logs/*
 Temp/
 mds*/
-images/
 Temp/
 prevScripts_dont_delete/
 Nimrod/
