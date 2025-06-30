@@ -47,6 +47,8 @@ class Simulate:
 
 
     def delete_files_in_directory(self, directory_path):
+        if not os.path.exists(directory_path):
+            return  # Nothing to delete if directory doesn't exist
         for filename in os.listdir(directory_path):
             file_path = os.path.join(directory_path, filename)
             # Check if it's a file and not .gitignore
@@ -56,12 +58,12 @@ class Simulate:
         
 
     def simulate(self):
+        if not os.path.exists(SIM_PATH):
+            os.makedirs(SIM_PATH)
 
-        # assert width < n_samples ,"image width is bigger than the number of samples"
-        # assert n_samples % width == 0,"image width does not divide the number of samples"
         if self.delete:
             self.delete_files_in_directory(SIM_PATH)
-
+        
         json_update(SAMPLES,self.n_samples)
         json_update(SIMULATIONS,self.n_sim)
         json_update(TOTAL_SNPS,self.SNPs)
@@ -213,5 +215,5 @@ class Simulate:
     
 
 if __name__ == '__main__':
-    sim = Simulate(100, 5, 100, 100, 1000, 0.05, 0.05, False, True)
+    sim = Simulate(100, 5, 100, 100, 1000, 0.05, 0.05, False, True, True)
     sim.simulate()

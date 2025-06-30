@@ -1,11 +1,11 @@
 ## Table of contents
-- [Table of contents](#table-of-contents)
-- [General info](#general-info)
-- [Dependencies](#dependencies)
-- [How to start](#how-to-start)
-- [Example](#example)
-- [Usage](#usage)
-- [Net](#net)
+- [Create Virtual Environment (Optional)](#create-virtual-environment-optional)
+- [Go into the repository](#go-into-the-repository)
+- [Temporary (Later will be removed)](#temporary-later-will-be-removed)
+- [Install dependencies](#install-dependencies)
+  - [Example](#example)
+  - [Usage](#usage)
+  - [Net](#net)
 
 ## General info
 GWANN is a deep learning algorithm implementing a convolutinal nerual network (CNN) to identify genetic variation that is associated with a trait of intrest. 
@@ -23,18 +23,25 @@ GWANN accepts Genotype data as compressed vcf format and a trait file (phenotype
 From your command line:
 
 ```bash
-# Clone this repository
-$ git clone --recurse-submodules https://github.com/hubner-lab/GWANN.git
+git clone --recurse-submodules https://github.com/hubner-lab/GWANN.git
+```
 
 # Create Virtual Environment (Optional)
-$ virtualenv -p python3.8 myenv
-$ source myenv/bin/activate
-
+```bash
+virtualenv -p python3.8 myenv
+source myenv/bin/activate
+```
 # Go into the repository
-$ cd GWANN 
-
+```bash
+cd GWANN Batch-Performance
+```
+# Temporary (Later will be removed)
+```bash
+git checkout 
+``` 
 # Install dependencies
-$ pip install -r requirements.txt 
+```bash
+pip install -r requirements.txt 
 ```
 
 ## Example 

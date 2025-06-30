@@ -39,3 +39,4 @@ myenv/
 simulation/data/
 results/*
 vcf_data
+logs/*
