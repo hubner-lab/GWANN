@@ -3,9 +3,12 @@ import os
 os.environ['TF_CPP_MIN_LOG_LEVEL'] = '3'
 
 from Simulate import Simulate
-# from train6 import Train  
-from train11 import Train  # improved since data is extremely imbalanced
+# from train6 import Train  # worked well
+# from train11 import Train  # improved since data is extremely imbalanced
+# from train11_BN import Train # for testing 
+from train13 import Train  
 from run3 import Run
+# from run3_BN import Run
 from utilities import json_get, json_update
 import resource
 from const import SIMULATIONS, LOGGER_DIR
@@ -14,11 +17,6 @@ from mylogger import Logger
 import time
 import resource
 
-
-
-# mds with vectors by nimrood 
-# from z_train4_mds_vectors import Train 
-# from z_run2_mds_vectors import Run 
 
 def log_resource_usage(start_time, logger, label=""):
     end_time = time.time()
@@ -55,7 +53,7 @@ class CLIManager:
     @click.option('--output','output_path',default="results/GWAS",help="prefix of output plot and causative SNPs indexes in the VCF")
     @click.option('--cpu/;','cpu',default=False,required=False,help="force on cpu")
     @click.option('--transform', '--f', 'func', default="", type=str, help="The name of the function to modify the output")
-    @click.option('--threshold', '--th', 'th', default=0, type=int, help="Plot resolution begin from this threshold (% Prediction)") 
+    @click.option('--threshold', '--th', 'th', default=50, type=int, help="Plot resolution begin from this threshold (% Prediction)") 
     def run(
         vcf: str,
         pheno_path:str,

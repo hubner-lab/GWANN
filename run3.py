@@ -116,7 +116,17 @@ class Run:
 
     def plot_data(self, chrom, output):
         chrom_arr = np.unique(chrom)
-        chrom_labels = chrom_arr[np.argsort([int(x[2:]) for x in chrom_arr])]
+        # chrom_labels = chrom_arr[np.argsort([int(x[2:]) for x in chrom_arr])]
+
+
+        sort_keys = []
+        for x in chrom_arr:
+            try:
+                sort_keys.append(int(x[2:]))  # Try parsing from 3rd character
+            except ValueError:
+                sort_keys.append(float('inf'))  # Push unrecognized chromosomes to the end
+        
+        chrom_labels = chrom_arr[np.argsort(sort_keys)]
 
         self.logger.info(f"Generating scatter plot with Plotly...")
 
@@ -176,7 +186,7 @@ class Run:
 
 
         output = self.load_model_and_predict(sorted_vcf, self.func)
-        causal_snps = len(np.where(output/100 > 0.5))
+        causal_snps = len(np.where(output/100 > 0.5)[0])
         percentage = causal_snps/len(output)
         print(f'Causal SNPs(%):{100*percentage}')
         self.plot_data(chrom, output)

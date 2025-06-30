@@ -6,10 +6,12 @@ from mylogger import Logger
 import os 
 from utilities import json_update
 from net3 import ModelBuilder  # assuming net3 is updated with softmax support
+# from net3_BN import ModelBuilder
 from tensorflow.keras.utils import to_categorical
 from tensorflow.keras.callbacks import ModelCheckpoint, EarlyStopping
-from sklearn.utils.class_weight import compute_class_weight
+# from sklearn.utils.class_weight import compute_class_weight
 from tensorflow.keras.metrics import AUC, Precision, Recall
+from tensorflow.keras.callbacks import ReduceLROnPlateau
 
 class Train:
     def __init__(self, model_name: str, total_simulations: int, sampledSitesIncludeCausals: int, columns: int,
@@ -67,28 +69,36 @@ class Train:
 
         total_causal = len(self.dataset.y[self.dataset.y == 1])
         total_non_causal_mds_include = len(self.dataset.y[self.dataset.y == 0])
-        ratio = int(total_non_causal_mds_include / total_causal)
-        class_weight_dict = {0: 1.0, 1: 1.0}
-        self.logger.info(f"Using class weights: {class_weight_dict}")
+        # ratio = int(total_non_causal_mds_include / total_causal)
+        # class_weight_dict = {0: 1.0, 1: 1.0}
+        # self.logger.info(f"Using class weights: {class_weight_dict}")
 
         self.logger.info("Training model...")
 
-        patience = 70
-        max_retries = 1000
+        patience = 100
+        max_retries = 100
         retries = 0
-        best_val_auc = float('-inf')
-
+        # best_val_auc = float('-inf')
+        best_val_precision = float('-inf')
         while retries <= max_retries:
             checkpoint_cb = ModelCheckpoint(
                 filepath=f"{MODEL_PATH_TENSOR_DIR}/{self.model_name}_best.h5",
                 save_best_only=True,
-                monitor='val_auc',
+                monitor='val_precision',
                 mode='max',
                 verbose=1
             )
 
+            reduce_lr_cb = ReduceLROnPlateau(
+                monitor='val_precision',
+                factor=0.5,
+                patience=10,
+                min_lr=1e-6,
+                verbose=1
+            )
+
             early_stop_cb = EarlyStopping(
-                monitor='val_auc',
+                monitor='val_precision',
                 patience=patience,
                 restore_best_weights=True,
                 mode='max',
@@ -100,15 +110,15 @@ class Train:
                 validation_data=(X_test, y_test),
                 epochs=self.epochs,
                 batch_size=self.batch_size,
-                callbacks=[checkpoint_cb, early_stop_cb],
-                class_weight=class_weight_dict,
+                callbacks=[checkpoint_cb, early_stop_cb, reduce_lr_cb],
+                # class_weight=class_weight_dict,
                 verbose=1
             )
 
-            val_auc = max(history.history['val_auc'])
-
-            if val_auc > best_val_auc:
-                best_val_auc = val_auc
+            # val_auc = max(history.history['val_auc'])
+            val_precision = max(history.history['val_precision'])
+            if val_precision > best_val_precision:
+                best_val_precision = val_precision
                 break
             else:
                 retries += 1

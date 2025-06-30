@@ -1,45 +1,33 @@
 # Ignore results directory
 results/
-
 # Ignore Python cache files
 __pycache__/
-
 # Ignore args directory
 args/
-
 # Ignore config directories
 config*/
-
 # Ignore log history
 log_history/
-
 # Ignore specific directories
 ../GWANN_2/vcf_data/
-
 vcf_data/
-
 *.sh
-
 .vscode/
-
-genome
-
+genom
 logs/
-
 Temp/
-
 mds*/
-
 prevScripts_dont_delete/
-
-
 Nimrod/
-
 z_pop_struct/
-
-
 z_nimrod_method/
-
 run3_made_for_simulation_only.py
-
 models/
+z_prepare_args_for_simulation/
+z_conver_to_pheno.py
+z_plot_stats_for_ratio.py
+train11_BN.py
+train11_balanced_T_N.py
+genome
+net3_BN.py
+run3_BN.py

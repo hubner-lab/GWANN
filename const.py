@@ -2,6 +2,7 @@ from pathlib import Path
 
 SIMULATIONS = "simulations"
 SAMPLES = "samples"
+TOTAL_SNPS = "total_snps"
 WIDTH = 'width'
 JSON_FILE = Path("data.json")
 current_dict = None 

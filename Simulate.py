@@ -9,7 +9,7 @@ import re
 from functools import partial
 import os
 import click 
-from const import SIM_GENOM_PATH, LOWER_BOUND, UPPER_BOUND, SIMULATIONS
+from const import SIM_GENOM_PATH, LOWER_BOUND, UPPER_BOUND, SIMULATIONS, TOTAL_SNPS
 import shlex
 import subprocess
 from mylogger import Logger
@@ -64,7 +64,7 @@ class Simulate:
 
         json_update(SAMPLES,self.n_samples)
         json_update(SIMULATIONS,self.n_sim)
-
+        json_update(TOTAL_SNPS,self.SNPs)
         seed_arr = self._seed()
         
         np.random.shuffle(seed_arr)

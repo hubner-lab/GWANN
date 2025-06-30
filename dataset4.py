@@ -1,4 +1,5 @@
-from simulationloader2 import SimulationDataReader # with mds Sariel description (Add None-causal as TN)
+from simulationloader3 import SimulationDataReader # with mds Sariel description (Add None-causal as TN) optimized 
+# from simulationloader2 import SimulationDataReader # with mds Sariel description (Add None-causal as TN)
 # from simulationloader import SimulationDataReader  # no mds 
 from genomeToImage import GenomeImage
 import tensorflow as tf
@@ -144,7 +145,7 @@ if __name__ == '__main__':
     # Example usage
     dataset = Dataset(
         total_simulations=100,
-        sampledSitesIncludeCausals=4,
+        sampledSitesIncludeCausals=2,
         columns=20,
         simPath=None,
         timeout=20.0
