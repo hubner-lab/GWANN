@@ -37,7 +37,7 @@ cd GWANN Batch-Performance
 ```
 # Temporary (Later will be removed)
 ```bash
-git checkout 
+git checkout Batch-Performance
 ``` 
 # Install dependencies
 ```bash
