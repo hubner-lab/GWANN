@@ -86,7 +86,7 @@ class Simulate:
             pool.close()
         except OSError:
             if not os.path.exists(GENOME_EXE):
-                raise click.ClickException('genome simulator not found') 
+                raise click.ClickException('genome simulator not found, please install it from README.md under Dependencies section, or adjust the GENOME_EXE variable in const.py') 
         self._debug_message2()
 
     
