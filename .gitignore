@@ -17,6 +17,8 @@ genom
 logs/
 Temp/
 mds*/
+images/
+Temp/
 prevScripts_dont_delete/
 Nimrod/
 z_pop_struct/
@@ -31,3 +33,10 @@ train11_balanced_T_N.py
 genome
 net3_BN.py
 run3_BN.py
+net4.py
+visualize.py
+train_N_models.sh
+script_runner.sh
+openImage.sh
+simulationloader.py
+simulationloader2.py
