@@ -49,7 +49,7 @@ chmod u+x dependencies.sh
 ./dependencies.sh
 ```
 
-# Install real data to teset GWANN (Optional)
+# Install real data to test GWANN (Optional)
 ```bash
 chmod u+x test_data.sh
 ./test_data.sh
