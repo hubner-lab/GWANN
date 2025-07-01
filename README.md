@@ -88,7 +88,6 @@ Commands:
 ```bash
 python3 GWANN.py simulate --help
 
-(myenv) amira@fidel:/mnt/data/amir/GWANN-TEST/GWANN$ python3 GWANN.py simulate  --help
 Usage: GWANN.py simulate [OPTIONS]
 
 Options:
