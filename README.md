@@ -39,11 +39,21 @@ cd GWANN
 ```bash
 git checkout Batch-Performance
 ``` 
-# Install dependencies
+# Install python dependencies
 ```bash
 pip install -r requirements.txt 
 ```
+# Install geno command
+```bash
+chmod u+x dependencies.sh
+./dependencies.sh
+```
 
+# Install real data to teset GWANN (Optional)
+```bash
+chmod u+x test_data.sh
+./test_data.sh
+```
 ## Example 
 
 ```bash
