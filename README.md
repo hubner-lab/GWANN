@@ -35,10 +35,6 @@ source myenv/bin/activate
 ```bash
 cd GWANN
 ```
-# Temporary (Later will be removed)
-```bash
-git checkout Batch-Performance
-``` 
 # Install python dependencies
 ```bash
 pip install -r requirements.txt 
