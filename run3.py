@@ -160,9 +160,20 @@ class Run:
         fig.update_layout(
             title="Prediction of SNPs associated with the trait.",
             xaxis=dict(tickmode='array', tickvals=x_ticks, ticktext=x_tick_labels, title="Chromosome"),
-                yaxis=dict(title="Prediction(%)", range=[0, 100]),
-            showlegend=True
+            yaxis=dict(title="Prediction(%)", range=[0, 100]),
+            showlegend=True,
+            shapes=[
+                dict(
+                    type='line',
+                    x0=0,
+                    x1=current_position,  # spans the full x-axis range
+                    y0=50,
+                    y1=50,
+                    line=dict(color='green', width=2, dash='dash')
+                )
+            ]
         )
+
 
         fig.write_html(f"{self.output_path}.html")
         self.logger.info(f"Scatter plot saved to {self.output_path}.html")
