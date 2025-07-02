@@ -119,7 +119,7 @@ Usage: GWANN.py train [OPTIONS]
 Options:
   -M, --MN TEXT         Model name to be saved  [required]
   -e, --epochs INTEGER  Number of training iterations
-  -S, --SNPs INTEGER    Number of SNP sites to be randomly sampled per batch
+  -S, --SNPs INTEGER    Number of SNP sites to be randomly sampled per simulation
                         [required]
   -b, --batch INTEGER   Batch size
   -r, --ratio FLOAT     Train / eval ratio
