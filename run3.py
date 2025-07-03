@@ -7,10 +7,9 @@ from utilities import json_get, createImages
 from mylogger import Logger
 import os 
 from scipy.special import logit
-from const import VCF_DATA_DIR
 import numpy as np
 import plotly.graph_objects as go
-
+import allel
 
 def tanh_map(output, scale=10):
     return np.tanh(scale * (output - 0.5))
@@ -49,11 +48,12 @@ class Run:
 
 
     def load_and_parse_data(self):
-        if not Path(VCF_DATA_DIR).is_dir():
-            Path(VCF_DATA_DIR).mkdir(parents=True, exist_ok=True)
+        npz_loc = "vcf_data/{0}.npz".format(Path(self.vcf).stem)
 
-        npz_loc = f"{VCF_DATA_DIR}/{Path(self.vcf).stem}.npz"
-        Logger(f'Message:', os.environ['LOGGER']).info(f"Loading VCF file: {self.vcf}")
+        if not Path(npz_loc).is_file():
+            Logger(f'Message:', os.environ['LOGGER']).info(f"Converting VCF to NPZ: {self.vcf} to {npz_loc}")
+            Logger(f'Message:', os.environ['LOGGER']).info(f"It may take a while to convert VCF to NPZ, please wait...")
+            allel.vcf_to_npz(self.vcf, npz_loc, fields='*', overwrite=True,chunk_length=8192,buffer_size=8192)
 
         callset = np.load(npz_loc, allow_pickle=True)
         Logger(f'Message:', os.environ['LOGGER']).info(f"Parsing VCF file: {self.vcf}")
