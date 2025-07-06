@@ -116,8 +116,6 @@ class Run:
 
     def plot_data(self, chrom, output):
         chrom_arr = np.unique(chrom)
-        # chrom_labels = chrom_arr[np.argsort([int(x[2:]) for x in chrom_arr])]
-
 
         sort_keys = []
         for x in chrom_arr:
@@ -157,6 +155,7 @@ class Run:
 
             current_position += len(chr_indices)
 
+        # Adding the 50% threshold line, aligned with the chromosome x-axis, and color-coded (green)
         fig.update_layout(
             title="Prediction of SNPs associated with the trait.",
             xaxis=dict(tickmode='array', tickvals=x_ticks, ticktext=x_tick_labels, title="Chromosome"),
@@ -166,14 +165,35 @@ class Run:
                 dict(
                     type='line',
                     x0=0,
-                    x1=current_position,  # spans the full x-axis range
+                    x1=current_position,  # spans the full x-axis range aligned with chromosomes
                     y0=50,
                     y1=50,
-                    line=dict(color='green', width=2, dash='dash')
+                    line=dict(color='green', width=2, dash='dash'),
+                    name="50% Threshold Line"
+                )
+            ],
+            updatemenus=[
+                dict(
+                    type="buttons",
+                    direction="right",
+                    x=1,
+                    y=1,
+                    buttons=[
+                        dict(
+                            label="Show 50% Line",
+                            method="relayout",
+                            args=[{"shapes[0].visible": True}]
+                        ),
+                        dict(
+                            label="Hide 50% Line",
+                            method="relayout",
+                            args=[{"shapes[0].visible": False}]
+                        )
+                    ]
                 )
             ]
-        )
 
+        )
 
         fig.write_html(f"{self.output_path}.html")
         self.logger.info(f"Scatter plot saved to {self.output_path}.html")
