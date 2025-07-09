@@ -1,7 +1,6 @@
 import numpy as np
 import pandas as pd
 from pathlib import Path
-from sklearn.manifold import MDS
 from tensorflow.keras.models import load_model
 from utilities import json_get, createImages
 from mylogger import Logger
@@ -10,7 +9,7 @@ from scipy.special import logit
 import numpy as np
 import plotly.graph_objects as go
 import allel
-
+import re
 def tanh_map(output, scale=10):
     return np.tanh(scale * (output - 0.5))
 
@@ -68,7 +67,6 @@ class Run:
             raise ValueError('Sample field missing in phenotype file')
         if self.trait not in pheno.keys():
             raise ValueError('Trait field missing in phenotype file')
-        
         return callset['calldata/GT'], callset['samples'], callset['variants/CHROM'], pheno 
 
     def calc_avg_vcf(self, vcf_data):
@@ -113,18 +111,36 @@ class Run:
 
         return  self.get_output_modified(output, funcName)
 
-
-    def plot_data(self, chrom, output):
+    
+    def filter_chrom(self, chrom):
         chrom_arr = np.unique(chrom)
 
-        sort_keys = []
-        for x in chrom_arr:
-            try:
-                sort_keys.append(int(x[2:]))  # Try parsing from 3rd character
-            except ValueError:
-                sort_keys.append(float('inf'))  # Push unrecognized chromosomes to the end
-        
-        chrom_labels = chrom_arr[np.argsort(sort_keys)]
+        filtered = []
+        for ch in chrom_arr:
+            l = len(ch)
+            build_chrom = ""
+            if  ch[l-1].isalpha():
+                ch = ch[:l-1]
+            for c in ch[::-1]:
+                if c.isalpha():
+                    break
+                build_chrom = c + build_chrom
+            filtered.append("chrome"+build_chrom)
+
+        sort_keys = [] 
+        for label in filtered:
+            match = re.search(r'chrome(\d+)', label)  
+            if match:
+                num_part = int(match.group(1))
+                sort_keys.append(num_part)
+            else:
+                sort_keys.append(float('inf'))
+        sorted_labels = [label for _, label in sorted(zip(sort_keys, chrom_arr))]       
+        return sorted_labels
+    
+    def plot_data(self, chrom, output):
+    
+        chrom_labels = self.filter_chrom(chrom)
 
         self.logger.info(f"Generating scatter plot with Plotly...")
 
