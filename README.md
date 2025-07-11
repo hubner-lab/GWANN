@@ -1,8 +1,9 @@
 ## Table of contents
 - [Create Virtual Environment (Optional)](#create-virtual-environment-optional)
 - [Go into the repository](#go-into-the-repository)
-- [Temporary (Later will be removed)](#temporary-later-will-be-removed)
-- [Install dependencies](#install-dependencies)
+- [Install python dependencies](#install-python-dependencies)
+- [Install geno command](#install-geno-command)
+- [Install real data to test GWANN (Optional)](#install-real-data-to-test-gwann-optional)
   - [Example](#example)
   - [Usage](#usage)
   - [Net](#net)
@@ -137,6 +138,7 @@ python3 GWANN.py run  --help
 Usage: GWANN.py run [OPTIONS]
 
 Options:
+Options:
   -v, --vcf TEXT             path to the VCF file  [required]
   -p, --pheno TEXT           path to the phenotype file (comma seperated csv
                              file)  [required]
@@ -151,7 +153,10 @@ Options:
                              (tanh_map, logit_map, log_map)
   --threshold, --th INTEGER  Plot resolution begin from this threshold (%
                              Prediction)
-  --help                     Show this message and exit
+  --geneModel, --GM TEXT     Choose one of the four models, where a value of
+                             0.5 is interpreted as follows: recessive = 0,
+                             dominant = 1, additive = 0.5, noHet = -1
+  --help                     Show this message and exit.
 ```
 
 

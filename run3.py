@@ -52,18 +52,18 @@ class Run:
         npz_loc = "vcf_data/{0}.npz".format(Path(self.vcf).stem)
 
         if not Path(npz_loc).is_file():
-            Logger(f'Message:', os.environ['LOGGER']).info(f"Converting VCF to NPZ: {self.vcf} to {npz_loc}")
-            Logger(f'Message:', os.environ['LOGGER']).info(f"It may take a while to convert VCF to NPZ, please wait...")
+            self.logger .info(f"Converting VCF to NPZ: {self.vcf} to {npz_loc}")
+            self.logger .info(f"It may take a while to convert VCF to NPZ, please wait...")
             allel.vcf_to_npz(self.vcf, npz_loc, fields='*', overwrite=True,chunk_length=8192,buffer_size=8192)
 
         callset = np.load(npz_loc, allow_pickle=True)
-        Logger(f'Message:', os.environ['LOGGER']).info(f"Parsing VCF file: {self.vcf}")
+        self.logger.info(f"Parsing VCF file: {self.vcf}")
 
         if not Path(self.pheno_path).is_file():
             print("Invalid phenotype file")
             exit(1)
 
-        Logger(f'Message:', os.environ['LOGGER']).info(f"Loading phenotype file: {self.pheno_path}")
+        self.logger.info(f"Loading phenotype file: {self.pheno_path}")
         pheno = pd.read_csv(self.pheno_path, index_col=None, sep=',')
         if 'sample' not in pheno.keys():
             raise ValueError('Sample field missing in phenotype file')
@@ -113,11 +113,11 @@ class Run:
 
         X_input = np.expand_dims(createImages(self.width,  sorted_vcf, self.sim_indivduals), axis=-1)  # Add channel dim (height, width, 1)
 
-        Logger(f'Message:', os.environ['LOGGER']).info(f"Loading trained TensorFlow model: {self.model_path}...")
+        self.logger.info(f"Loading trained TensorFlow model: {self.model_path}...")
         model = load_model(self.model_path)
 
 
-        Logger(f'Message:', os.environ['LOGGER']).info(f"Running inference on the model...")
+        self.logger.info(f"Running inference on the model...")
         predictions = model.predict(X_input, batch_size=4096)  # batch_size to make the prediction process run faster, multi process created 
 
         output =  predictions[:, 1]
