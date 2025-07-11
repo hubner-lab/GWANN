@@ -9,7 +9,7 @@ import re
 from functools import partial
 import os
 import click 
-from const import SIM_GENOM_PATH, LOWER_BOUND, UPPER_BOUND, SIMULATIONS, TOTAL_SNPS
+from const import SIM_GENOM_PATH, LOWER_BOUND, UPPER_BOUND, TOTAL_SNPS
 import shlex
 import subprocess
 from mylogger import Logger
@@ -17,7 +17,7 @@ from mylogger import Logger
 class Simulate:
 
 
-    def __init__(self, SNPs: int, subpop: int, n_samples: int, n_sim: int, causalSNPs: int, maf: float, miss: float, equal: bool, debug: bool, delete: bool):
+    def __init__(self, SNPs: int, subpop: int, n_samples: int, n_sim: int, causalSNPs: int, maf: float, miss: float, equal: bool, debug: bool, delete: int):
         """
         Initialize the simulation parameters.
 
@@ -64,8 +64,6 @@ class Simulate:
         if self.delete:
             self.delete_files_in_directory(SIM_PATH)
         
-        json_update(SAMPLES,self.n_samples)
-        json_update(SIMULATIONS,self.n_sim)
         json_update(TOTAL_SNPS,self.SNPs)
         seed_arr = self._seed()
         

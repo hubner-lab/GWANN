@@ -1,7 +1,7 @@
 from dataset4 import Dataset
 from sklearn.model_selection import train_test_split 
 import numpy as np
-from const import MODEL_PATH_TENSOR_DIR
+from const import MODEL_PATH_TENSOR_DIR, SAMPLES, WIDTH
 from mylogger import Logger
 import os 
 from utilities import json_update
@@ -13,10 +13,13 @@ from sklearn.metrics import precision_score, recall_score, f1_score, average_pre
 
 class Train:
     def __init__(self, model_name:str, total_simulations:int, sampledSitesIncludeCausals: int, columns:int,
-                 batch_size:int, epochs:int,mds:bool, simPath: str = "./simulation/data/", test_ratio:float = 0.2):
+                 batch_size:int, epochs:int,mds:bool, individuals:int, simPath: str = "./simulation/data/", test_ratio:float = 0.2):
 
         self.model_name = model_name
-        self.dataset = Dataset(total_simulations, sampledSitesIncludeCausals,columns,mds, simPath)
+        self.individuals = individuals
+        json_update(SAMPLES,self.individuals)
+        json_update(WIDTH,columns)
+        self.dataset = Dataset(total_simulations, sampledSitesIncludeCausals,columns,mds, individuals,simPath)
         self.batch_size = batch_size
         self.epochs = epochs
         self.test_ratio = test_ratio

@@ -2,33 +2,13 @@ import numpy as np
 import pandas as pd
 from pathlib import Path
 from tensorflow.keras.models import load_model
-from utilities import json_get, createImages
+from utilities import json_get, createImages, tanh_map, log_map, logit_map
 from mylogger import Logger
 import os 
-from scipy.special import logit
 import numpy as np
 import plotly.graph_objects as go
 import allel
 import re
-def tanh_map(output, scale=10):
-    return np.tanh(scale * (output - 0.5))
-
-
-def logit_map(output):
-        EPSILON = 0.1
-        clipoutput = np.clip(output, EPSILON, 1 - EPSILON)
-        return logit(clipoutput)
-
-
-def log_map(output):
-    EPSILON  = 0.0001
-    clipoutput = np.clip(output, EPSILON, 1 - EPSILON)  # to avoid log(1-1) = log(0)
-    res =  -np.log(1-clipoutput)
-    resNorm = res / np.max(res) # normalize to 0-1
-    SCALE = 100
-    return  SCALE* resNorm
-
-
 
 
 class Run:

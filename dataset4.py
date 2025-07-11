@@ -1,17 +1,14 @@
-from simulationloader3 import SimulationDataReader # with mds Sariel description (Add None-causal as TN) optimized 
-# from simulationloader2 import SimulationDataReader # with mds Sariel description (Add None-causal as TN)
-# from simulationloader import SimulationDataReader  # no mds 
+from simulationloader4 import SimulationDataReader
 from genomeToImage import GenomeImage
 import tensorflow as tf
 from mylogger import Logger
 import os
 from concurrent.futures import ProcessPoolExecutor, as_completed, TimeoutError
 from tqdm import tqdm
-from utilities import json_update
 import multiprocessing
 multiprocessing.set_start_method('spawn', force=True)
-
-def loader_helper(simPath: str, sampledSitesIncludeCausals: int, columns: int, simIndex: int, mds:bool):
+import numpy as np 
+def loader_helper(simPath: str, sampledSitesIncludeCausals: int, columns: int, simIndex: int, mds:bool, trained_individuals:int):
     """
     Load one simulation, convert each genome sample into a 2D image,
     collect its labels and population vector.
@@ -26,13 +23,22 @@ def loader_helper(simPath: str, sampledSitesIncludeCausals: int, columns: int, s
 
 
     individuals = simData['input'].shape[1]
-    rows = individuals // columns
+    rows = trained_individuals // columns
+    
     genomeImage = GenomeImage(rows, columns)
 
     X_local, y_local= [], []
-
+    
+    padding = False
+    if trained_individuals > individuals:
+        padding = True
     for idx, sample in enumerate(simData['input']):
         try:
+            sample = np.array(sample)
+            if padding:
+                sample = np.pad(sample, (0, trained_individuals - individuals),  constant_values=-10)
+            else:
+                sample = sample[:individuals]
             img = genomeImage.transform_to_image(sample)
         except Exception as e:
             Logger('Message:', os.environ['LOGGER']).error(
@@ -55,6 +61,7 @@ class Dataset:
         sampledSitesIncludeCausals: int,
         columns: int,
         mds:bool,
+        individuals:str,
         simPath: str = None,
         timeout: float = 30.0,
     ):
@@ -65,12 +72,10 @@ class Dataset:
         self.simPath = simPath or self.BASEPATH
         self.timeout = timeout
         self.mds = mds
-
-        json_update("width", self.columns)
+        self.individuals = individuals
         self.X: tf.Tensor = None
         self.y: tf.Tensor = None
-
-        self.logger = Logger('Message:', os.environ['LOGGER'])
+        self.logger = Logger(f'Message:', f"{os.environ['LOGGER']}")
 
     def load_data(self):
         """
@@ -94,7 +99,8 @@ class Dataset:
                     self.sampledSitesIncludeCausals,
                     self.columns,
                     idx,
-                    self.mds
+                    self.mds,
+                    self.individuals
                 ): idx
                 for idx in range(self.total_simulations)
             }
@@ -147,8 +153,10 @@ if __name__ == '__main__':
         total_simulations=100,
         sampledSitesIncludeCausals=2,
         columns=20,
-        simPath=None,
-        timeout=20.0
+        individuals=300,
+        mds=False,
+        simPath="/mnt/data/amir/GWANN-TEST/GWANN/simulation/data",
+        timeout=20.0,
     )
 
     # 1) Load into memory and build tensors
