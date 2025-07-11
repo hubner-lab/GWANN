@@ -28,10 +28,10 @@ def log_resource_usage(start_time, logger, label=""):
     sys_cpu = usage.ru_stime
 
     # Colored console output using logger (assumes StreamHandler supports color)
-    logger.info(f"\033[96m{label} - Runtime: {runtime:.2f}s\033[0m")         # Cyan
-    logger.info(f"\033[93m{label} - Max Memory Usage: {mem_usage:.2f} MB\033[0m")  # Yellow
-    logger.info(f"\033[94m{label} - User CPU time: {user_cpu:.2f}s\033[0m")   # Blue
-    logger.info(f"\033[94m{label} - System CPU time: {sys_cpu:.2f}s\033[0m")  # Blue
+    logger.info(f"\033[96m{label} - Runtime: {runtime:.2f}s\033[0m")        
+    logger.info(f"\033[93m{label} - Max Memory Usage: {mem_usage:.2f} MB\033[0m") 
+    logger.info(f"\033[94m{label} - User CPU time: {user_cpu:.2f}s\033[0m")   
+    logger.info(f"\033[94m{label} - System CPU time: {sys_cpu:.2f}s\033[0m")  
 
 class CLIManager:
     def __init__(self):
@@ -53,7 +53,8 @@ class CLIManager:
     @click.option('--output','output_path',default="results/GWAS",help="prefix of output plot and causative SNPs indexes in the VCF")
     @click.option('--cpu/;','cpu',default=False,required=False,help="force on cpu")
     @click.option('--transform', '--f', 'func', default="", type=str, help="The name of the function to modify the output (tanh_map, logit_map, log_map)")
-    @click.option('--threshold', '--th', 'th', default=50, type=int, help="Plot resolution begin from this threshold (% Prediction)") 
+    @click.option('--threshold', '--th', 'th', default=0, type=int, help="Plot resolution begin from this threshold (% Prediction)")
+    @click.option('--geneModel', '--GM', 'gm', default="recessive", type=str, help="Choose one of the four models, where a value of 0.5 is interpreted as follows: recessive = 0, dominant = 1, additive = 0.5, noHet = -1")  
     def run(
         vcf: str,
         pheno_path:str,
@@ -62,7 +63,8 @@ class CLIManager:
         output_path:str,
         cpu:bool,
         func:str,
-        th:int 
+        th:int,
+        gm:str
         )-> None:
         """Run GWANN analysis.
 
@@ -77,6 +79,9 @@ class CLIManager:
             model (str): Path to the trained model.
             output_path (str): Output file prefix for plots and SNP indexes.
             cpu (bool): Flag to force CPU usage for computation.
+            func: The name of the function to modify the output (tanh_map, logit_map, log_map)
+            th: Plot resolution begin from this threshold (% Prediction)
+            gm: Choose one of the four models, where a value of 0.5 is interpreted as follows: recessive = 0, dominant = 1, additive = 0.5, noHet = -1
         """
         start_time = time.time()
         modelPath = json_get("model_name") 
@@ -84,8 +89,8 @@ class CLIManager:
         json_update("current_command", 'run')
         LOGGER_FILE = "run"
         os.environ['LOGGER'] = f'{LOGGER_DIR}/{LOGGER_FILE}_{datetime.datetime.now().strftime("%Y-%m-%d_%H-%M-%S")}.log'
-        Logger(f'Message:', f"{os.environ['LOGGER']}").debug(f"Running GWANN analysis with VCF: {vcf}, phenotype path: {pheno_path}, trait: {trait}, model: {modelPath}, output path: {output_path}, threshold: {th}, function: {func}")
-        Run(vcf, pheno_path, trait, modelPath, output_path, cpu, func, th).start()
+        Logger(f'Message:', f"{os.environ['LOGGER']}").debug(f"Running GWANN analysis with VCF: {vcf}, phenotype path: {pheno_path}, trait: {trait}, model: {modelPath}, output path: {output_path}, threshold: {th}, function: {func}, geneModel= {gm}")
+        Run(vcf, pheno_path, trait, modelPath, output_path, cpu, func, th,gm).start()
         log_resource_usage(start_time,Logger(f'Message:', f"{os.environ['LOGGER']}"),"Run")
         pass
 

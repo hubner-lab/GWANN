@@ -32,7 +32,8 @@ def log_map(output):
 
 
 class Run:
-    def __init__(self,vcf, pheno_path, trait,model, output_path, cpu, func, th):
+    GeneModel = {'recessive':0,'dominant':1,'additive':0.5,'noHet':-1}
+    def __init__(self,vcf, pheno_path, trait,model, output_path, cpu, func, th, gm):
         self.vcf = vcf
         self.pheno_path = pheno_path
         self.trait = trait
@@ -44,6 +45,7 @@ class Run:
         self.logger = Logger(f'Message:', f"{os.environ['LOGGER']}")
         self.func = func
         self.th = th
+        self.gm = gm
 
 
     def load_and_parse_data(self):
@@ -70,8 +72,22 @@ class Run:
         return callset['calldata/GT'], callset['samples'], callset['variants/CHROM'], pheno 
 
     def calc_avg_vcf(self, vcf_data):
+        """
+        Normalize the genome values to be in {-1.0, 1.0}.
+        The value 0.5 is interpreted according to the `gm` flag:
+            - 'recessive' -> 0
+            - 'dominant'  -> 1
+            - 'additive'  -> 0.5
+            - 'noHet'     -> -1
+        """
         tmp_vcf = (vcf_data[:, :, 0] + vcf_data[:, :, 1]) / 2
-        tmp_vcf[np.where(tmp_vcf == 0.5)] = 0
+        if self.gm in self.GeneModel.keys():
+            self.logger.info(f'Assigning Genemodel for {self.gm}={self.GeneModel[self.gm]}')
+            tmp_vcf[np.where(tmp_vcf == 0.5)] = self.GeneModel[self.gm]
+        else:
+            self.logger.error(f"Unknown genetic model: {self.gm}")
+            self.logger.info("Assigning Genmodel to default value 0")
+            tmp_vcf[np.where(tmp_vcf == 0.5)] = 0
         return tmp_vcf
     
     def get_output_modified(self,output, funcName = ""):
@@ -175,7 +191,7 @@ class Run:
         fig.update_layout(
             title="Prediction of SNPs associated with the trait.",
             xaxis=dict(tickmode='array', tickvals=x_ticks, ticktext=x_tick_labels, title="Chromosome"),
-            yaxis=dict(title="Prediction(%)", range=[0, 100]),
+            yaxis=dict(title="Prediction(%)", range=[self.th, 100]),
             showlegend=True,
             shapes=[
                 dict(
