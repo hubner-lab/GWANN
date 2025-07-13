@@ -1,17 +1,12 @@
 import click
 import os
 os.environ['TF_CPP_MIN_LOG_LEVEL'] = '3'
-
 from Simulate import Simulate
-# from train6 import Train  # worked well
-# from train11 import Train  # improved since data is extremely imbalanced
-# from train11_BN import Train # for testing 
 from train13 import Train  
 from run3 import Run
-# from run3_BN import Run
-from utilities import json_get, json_update
+from utilities import json_get, json_update, count_genome_txt_files
 import resource
-from const import SIMULATIONS, LOGGER_DIR
+from const import LOGGER_DIR
 import datetime
 from mylogger import Logger
 import time
@@ -106,7 +101,7 @@ class CLIManager:
     @click.option('--miss', 'miss', default=0.03, type=float, help="Proportion of missing data")
     @click.option('--equal-variance', 'equal', default=False, is_flag=True, help="Set this if equal variance is expected among SNPs (ignore for single SNP)")
     @click.option('--verbose', 'debug', default=False, is_flag=True, help="Increase verbosity")
-    @click.option('--delete', 'delete', default=True, is_flag=True, help="Delete the current simulated files")
+    @click.option('--delete', 'delete', default=False, is_flag=True, help="Delete previous simulated files")
     def simulate(
         pop: int,
         subpop: int,
@@ -135,11 +130,12 @@ class CLIManager:
             miss (float): Proportion of missing data.
             equal (bool): Set this if equal variance is expected among SNPs (ignore for single SNP)
             debug (bool): Flag to enable verbose logging for debugging.
+            delete (bool): Flag to enable deletion of previous simulated file
         """
         start_time = time.time()
         LOGGER_FILE = "simulate"
         os.environ['LOGGER'] = f'{LOGGER_DIR}/{LOGGER_FILE}_{datetime.datetime.now().strftime("%Y-%m-%d_%H-%M-%S")}.log'
-        Logger(f'Message:', f"{os.environ['LOGGER']}").debug(f"Simulating {n_sim} populations with {pop} SNPs, {subpop} subpopulations, {n_samples} samples, {n_snps} causal SNPs, MAF: {maf}, missing data: {miss}, equal variance: {equal}")
+        Logger(f'Message:', f"{os.environ['LOGGER']}").debug(f"Simulating {n_sim} populations with {pop} SNPs, {subpop} subpopulations, {n_samples} samples, {n_snps} causal SNPs, MAF: {maf}, missing data: {miss}, equal variance: {equal}, delete current simulated files: {delete}, verbose mode: {debug}")
         Simulate(pop, subpop, n_samples, n_sim, n_snps, maf, miss, equal, debug, delete).simulate()
         log_resource_usage(start_time,Logger(f'Message:', f"{os.environ['LOGGER']}"), "Simulate")
 
@@ -148,12 +144,13 @@ class CLIManager:
     @click.command()
     @click.option('-M', '--MN', 'model_name', required=True, type=str, help="Model name to be saved")
     @click.option('-e', '--epochs', 'epochs', default=100, type=int, help="Number of training iterations")
-    @click.option('-S', '--SNPs', 'n_snps', required=True, type=int, help="Number of SNP sites to be randomly sampled per batch")
+    @click.option('-S', '--SNPs', 'n_snps', required=True, type=int, help="Number of SNP sites to be randomly sampled per simulation")
     @click.option('-b', '--batch', 'batch', default=20, type=int, help="Batch size")
     @click.option('-r', '--ratio', 'ratio', default=0.8, type=float, help="Train / eval ratio")
     @click.option('-w', '--width', 'width', default=15, type=int, help="Image width must be a divisor of the number of individuals")
     @click.option('--path', 'sim_path', required=True, type=str, help="Path to the simulated data")
     @click.option('--mds', 'mds', default=False,is_flag=True, type=bool, help="Apply mds transformation on the phenotype matrix, add TN to avoid population structure")
+    @click.option('--indvs', 'individuals', required=True,type=int, help="Number of the individuals per simulation")
     def train(
         model_name: str,
         epochs: int, 
@@ -162,7 +159,8 @@ class CLIManager:
         ratio: float, 
         width: int, 
         sim_path: str,
-        mds,
+        mds:bool,
+        individuals:int
     ) -> None:
         """Train the model for GWANN analysis.
 
@@ -172,7 +170,7 @@ class CLIManager:
 
         Args:
             epochs (int): Number of epochs (training iterations).
-            n_snps (int): Number of SNPs to sample per batch.
+            n_snps (int): Number of SNPs to sample per simulation.
             batch (int): Batch size for training.
             ratio (float): Ratio of training data to evaluation data (train/eval split).
             width (int): Image width for data processing.
@@ -180,6 +178,8 @@ class CLIManager:
             debug (bool): Flag to enable verbose logging for debugging.
             deterministic (bool): Flag to ensure deterministic results for reproducibility.
             cpu (bool): Flag to force training on CPU.
+            mds (bool): Apply mds transformation on the phenotype matrix, add TN to avoid population structure
+            individuals (int): Number of the individuals per simulation 
         
         Returns:
             None: This function does not return any value.
@@ -187,9 +187,9 @@ class CLIManager:
         start_time = time.time()
         LOGGER_FILE = "train"
         os.environ['LOGGER'] = f'{LOGGER_DIR}/{LOGGER_FILE}_{datetime.datetime.now().strftime("%Y-%m-%d_%H-%M-%S")}.log'
-        Logger(f'Message:', f"{os.environ['LOGGER']}").debug(f"Training with {epochs} epochs, {n_snps} sampled SNPs, batch size {batch}, ratio {ratio}, width {width}, path {sim_path}, model name {model_name}, mds: {mds}")
-        total_simulations = json_get(SIMULATIONS)
-        Train(model_name, total_simulations, n_snps, width, batch, epochs,mds, sim_path, ratio).run()
+        Logger(f'Message:', f"{os.environ['LOGGER']}").debug(f"Training with {epochs} epochs, {n_snps} sampled SNPs, batch size: {batch}, ratio: {ratio}, width: {width}, path: {sim_path}, model name: {model_name}, mds: {mds}, number of individuals: {individuals}")
+        total_simulations = count_genome_txt_files(sim_path)
+        Train(model_name, total_simulations, n_snps, width, batch, epochs,mds, individuals,sim_path, ratio).run()
         log_resource_usage(start_time,Logger(f'Message:', f"{os.environ['LOGGER']}"), "Train")
         
 

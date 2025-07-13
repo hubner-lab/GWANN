@@ -10,13 +10,14 @@ from tensorflow.keras.utils import to_categorical
 from tensorflow.keras.callbacks import ModelCheckpoint, ReduceLROnPlateau, EarlyStopping
 from tensorflow.keras.optimizers import SGD
 from sklearn.metrics import precision_score, recall_score, f1_score, average_precision_score
-
+from const import MODEL_NAME
 class Train:
     def __init__(self, model_name:str, total_simulations:int, sampledSitesIncludeCausals: int, columns:int,
-                 batch_size:int, epochs:int,mds:bool, simPath: str = "./simulation/data/", test_ratio:float = 0.2):
+                 batch_size:int, epochs:int,mds:bool, numberOfIndividuals:int,
+                 simPath: str = "./simulation/data/", test_ratio:float = 0.2):
 
         self.model_name = model_name
-        self.dataset = Dataset(total_simulations, sampledSitesIncludeCausals,columns,mds, simPath)
+        self.dataset = Dataset(total_simulations, sampledSitesIncludeCausals,columns,mds, numberOfIndividuals ,simPath)
         self.batch_size = batch_size
         self.epochs = epochs
         self.test_ratio = test_ratio
@@ -93,7 +94,7 @@ class Train:
                   callbacks=[checkpoint_cb, early_stopping_cb, lr_scheduler],
                   verbose=1)
 
-        json_update("model_name", f"{MODEL_PATH_TENSOR_DIR}/{self.model_name}.h5")
+        json_update(MODEL_NAME, f"{MODEL_PATH_TENSOR_DIR}/{self.model_name}.h5")
         self.logger.info(f"Model name updated to {MODEL_PATH_TENSOR_DIR}/{self.model_name}.h5")
         model.save(f"{MODEL_PATH_TENSOR_DIR}/{self.model_name}.h5")
 

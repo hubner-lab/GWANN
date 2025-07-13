@@ -1,6 +1,5 @@
-from simulationloader3 import SimulationDataReader # with mds Sariel description (Add None-causal as TN) optimized 
-# from simulationloader2 import SimulationDataReader # with mds Sariel description (Add None-causal as TN)
-# from simulationloader import SimulationDataReader  # no mds 
+from simulationloader3 import SimulationDataReader
+import numpy as np
 from genomeToImage import GenomeImage
 import tensorflow as tf
 from mylogger import Logger
@@ -9,9 +8,10 @@ from concurrent.futures import ProcessPoolExecutor, as_completed, TimeoutError
 from tqdm import tqdm
 from utilities import json_update
 import multiprocessing
+from const import WIDTH, TRAINED_INDIVIDUALS
 multiprocessing.set_start_method('spawn', force=True)
 
-def loader_helper(simPath: str, sampledSitesIncludeCausals: int, columns: int, simIndex: int, mds:bool):
+def loader_helper(simPath: str, sampledSitesIncludeCausals: int, columns: int, simIndex: int, mds:bool, individualsPassedByUser):
     """
     Load one simulation, convert each genome sample into a 2D image,
     collect its labels and population vector.
@@ -26,13 +26,19 @@ def loader_helper(simPath: str, sampledSitesIncludeCausals: int, columns: int, s
 
 
     individuals = simData['input'].shape[1]
-    rows = individuals // columns
+    rows = individualsPassedByUser // columns
     genomeImage = GenomeImage(rows, columns)
 
     X_local, y_local= [], []
 
     for idx, sample in enumerate(simData['input']):
         try:
+            if individualsPassedByUser > individuals:
+                pad_width = individualsPassedByUser - individuals
+                sample = np.concatenate([sample, np.full((pad_width,), -1)])
+            elif individualsPassedByUser < individuals:
+                sample = sample[:individualsPassedByUser]
+            sample += 1 # shift array value by 1 
             img = genomeImage.transform_to_image(sample)
         except Exception as e:
             Logger('Message:', os.environ['LOGGER']).error(
@@ -55,6 +61,7 @@ class Dataset:
         sampledSitesIncludeCausals: int,
         columns: int,
         mds:bool,
+        individualsPassedByUser:int,
         simPath: str = None,
         timeout: float = 30.0,
     ):
@@ -65,12 +72,14 @@ class Dataset:
         self.simPath = simPath or self.BASEPATH
         self.timeout = timeout
         self.mds = mds
-
-        json_update("width", self.columns)
+        self.individualsPassedByUser = individualsPassedByUser
+        json_update(WIDTH, self.columns)
+        json_update(TRAINED_INDIVIDUALS, self.individualsPassedByUser)
         self.X: tf.Tensor = None
         self.y: tf.Tensor = None
 
-        self.logger = Logger('Message:', os.environ['LOGGER'])
+        # self.logger = Logger('Message:', os.environ['LOGGER'])
+        self.logger = Logger('Message:', "1")
 
     def load_data(self):
         """
@@ -85,6 +94,13 @@ class Dataset:
         X_all, y_all = [], []
         # loader_helper(self.simPath, self.sampledSitesIncludeCausals, self.columns, 0) # for debug
         self.logger.debug(f"Running simulation with mds={self.mds}")
+        if self.individualsPassedByUser % self.columns != 0:
+            error_msg = (
+                f"Invalid configuration: individualsPassedByUser={self.individualsPassedByUser} "
+                f"must be divisible by columns={self.columns} (WIDTH)."
+            )
+            self.logger.error(error_msg)
+            raise ValueError(error_msg)
         with ProcessPoolExecutor(max_workers=cpus) as executor:
             # submit all sims
             futures = {
@@ -94,7 +110,8 @@ class Dataset:
                     self.sampledSitesIncludeCausals,
                     self.columns,
                     idx,
-                    self.mds
+                    self.mds,
+                    self.individualsPassedByUser
                 ): idx
                 for idx in range(self.total_simulations)
             }
@@ -144,11 +161,12 @@ class Dataset:
 if __name__ == '__main__':
     # Example usage
     dataset = Dataset(
-        total_simulations=100,
+        total_simulations=1,
         sampledSitesIncludeCausals=2,
         columns=20,
         simPath=None,
-        timeout=20.0
+        timeout=20.0,
+        mds=False
     )
 
     # 1) Load into memory and build tensors

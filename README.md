@@ -55,8 +55,8 @@ chmod u+x test_data.sh
 
 ```bash
 # Simulate 100 populations with 10000 SNPS, 1 subpopulation of 300 individuals, 2 causative SNP
-# 0.05 minor allele frequency and 
-python3 GWANN.py simulate -p 10000 -s 300 -n 100 --maf 0.05 --miss 0.03 -P 1 -S 2
+# 0.05 minor allele frequency and delete current simulated files set to True
+python3 GWANN.py simulate -p 10000 -s 300 -n 100 --maf 0.05 --miss 0.03 -P 1 -S 2 --delete
 
 # Train the network for 1000 epochs with a randomly sampled 50 SNP (causative SNP included)
 # a training-validation ratio of 70/30, image width of 20 columns, the path to the simulated data, and the model name 

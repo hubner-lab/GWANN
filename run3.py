@@ -10,6 +10,7 @@ import numpy as np
 import plotly.graph_objects as go
 import allel
 import re
+from const import WIDTH, TRAINED_INDIVIDUALS
 def tanh_map(output, scale=10):
     return np.tanh(scale * (output - 0.5))
 
@@ -40,8 +41,8 @@ class Run:
         self.model_path = model
         self.output_path = output_path
         self.cpu = cpu
-        self.width = json_get("width")
-        self.sim_indivduals = json_get("samples")
+        self.width = json_get(WIDTH)
+        self.sim_individuals = json_get(TRAINED_INDIVIDUALS)
         self.logger = Logger(f'Message:', f"{os.environ['LOGGER']}")
         self.func = func
         self.th = th
@@ -111,7 +112,7 @@ class Run:
     def load_model_and_predict(self, sorted_vcf, funcName=""):
         
 
-        X_input = np.expand_dims(createImages(self.width,  sorted_vcf, self.sim_indivduals), axis=-1)  # Add channel dim (height, width, 1)
+        X_input = np.expand_dims(createImages(self.width,  sorted_vcf, self.sim_individuals), axis=-1)  # Add channel dim (height, width, 1)
 
         self.logger.info(f"Loading trained TensorFlow model: {self.model_path}...")
         model = load_model(self.model_path)

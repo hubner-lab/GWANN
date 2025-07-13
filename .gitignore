@@ -40,3 +40,4 @@ simulation/data/
 results/*
 vcf_data
 logs/*
+genome-0.2-Linux/*

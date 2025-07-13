@@ -1,6 +1,6 @@
 
 from typing import List, Tuple
-from const import SAMPLES, SIM_PATH, GENOME_EXE
+from const import SIM_PATH, GENOME_EXE
 from utilities import  json_update
 import numpy as np
 import multiprocessing
@@ -9,7 +9,7 @@ import re
 from functools import partial
 import os
 import click 
-from const import SIM_GENOM_PATH, LOWER_BOUND, UPPER_BOUND, SIMULATIONS, TOTAL_SNPS
+from const import SIM_GENOM_PATH, LOWER_BOUND, UPPER_BOUND, TOTAL_SNPS
 import shlex
 import subprocess
 from mylogger import Logger
@@ -64,8 +64,6 @@ class Simulate:
         if self.delete:
             self.delete_files_in_directory(SIM_PATH)
         
-        json_update(SAMPLES,self.n_samples)
-        json_update(SIMULATIONS,self.n_sim)
         json_update(TOTAL_SNPS,self.SNPs)
         seed_arr = self._seed()
         
