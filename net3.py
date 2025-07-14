@@ -8,8 +8,8 @@ class ModelBuilder:
 
     def build(self):
         matrix_input = Input(shape=(self.height, self.width, 1))
-
-        x = layers.Conv2D(3, kernel_size=(2, 2), activation='relu')(matrix_input)
+        x = layers.Masking(mask_value=-1.0)(matrix_input)
+        x = layers.Conv2D(3, kernel_size=(2, 2), activation='relu')(x)
         x = layers.MaxPooling2D(pool_size=(2, 2))(x)
         x = layers.Conv2D(5, kernel_size=(2, 2), activation='relu')(x)
         x = layers.MaxPooling2D(pool_size=(2, 2))(x)

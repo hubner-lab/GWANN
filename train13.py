@@ -5,7 +5,7 @@ from const import MODEL_PATH_TENSOR_DIR
 from mylogger import Logger
 import os 
 from utilities import json_update
-from net3 import ModelBuilder  # assuming net3 is updated with softmax support
+from net4 import ModelBuilder  # assuming net3 is updated with softmax support
 from tensorflow.keras.utils import to_categorical
 from tensorflow.keras.callbacks import ModelCheckpoint, ReduceLROnPlateau, EarlyStopping
 from tensorflow.keras.optimizers import SGD
