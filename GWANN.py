@@ -214,7 +214,7 @@ class CLIManager:
         soft, hard = resource.getrlimit(resource.RLIMIT_AS)
         resource.setrlimit(resource.RLIMIT_AS, (self.get_memory() * 1024 // 2, hard))
 
-
+ 
     def get_memory(self):
         with open('/proc/meminfo', 'r') as mem:
             free_memory = 0

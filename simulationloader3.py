@@ -3,10 +3,12 @@ import numpy as np
 from sklearn.manifold import MDS
 from utilities import json_get
 from const import TOTAL_SNPS 
+from sklearn.impute import SimpleImputer
 class SimulationDataReader:
-    SUFFIX_EMMA_GENO = '0.emma_geno'
+    ALLELE_MAPPING = {'A': 1, 'T': 0, '0': -1}
+    PED_COLUMNS = ['Family_ID', 'Individual_ID', 'Paternal_ID', 'Maternal_ID', 'Sex', 'Phenotype']
+    SUFFIX_GENO_PED = '0.ped'
     SUFFIX_CAUSAL = '0.causal'
-    SUFFIX_EMMA_PHENO = '0.emma_pheno'
     COLUMN = 1 
     count_once = False
     SNP_total = 0
@@ -84,43 +86,65 @@ class SimulationDataReader:
             temp = self.geno_data_np[non_causal_snps_indices,:] # Take the specific snps  sub-Matrix 
             self.geno_data_reordered_mds  = temp[:, self.mds_arg_sorted] # reorder sub-Matrix columns according to the mds sorted indices 
 
+    def process_ped_data(self, all_snps):
+        alleles_columns = [f'allel{i}' for i in range(all_snps*2) ]
+        allele1_columns = alleles_columns[::2]
+        allele2_columns = alleles_columns[1::2]
+        self.geno_data_pd.columns = self.PED_COLUMNS + alleles_columns
 
+        matrix1 = self.geno_data_pd[allele1_columns].replace(self.ALLELE_MAPPING).to_numpy()
+        matrix2 = self.geno_data_pd[allele2_columns].replace(self.ALLELE_MAPPING).to_numpy()
+
+        self.geno_data_np = matrix1 + matrix2
+        # imputer = SimpleImputer(strategy='mean')
+        # self.geno_data_np = imputer.fit_transform(self.geno_data_np)
+
+    
+        max_val = np.max(np.abs(self.geno_data_np))
+        if max_val > 0:  # Avoid division by zero
+            self.geno_data_np = self.geno_data_np / max_val
+        
+        self.geno_data_np = self.geno_data_np .T
+
+        self.pheno_data_np = self.geno_data_pd['Phenotype'].to_numpy()
+
+
+        
+        
     def load(self, index, total_samples=None):
-        emma_geno_file = f'{self.base_path}{index}{self.SUFFIX_EMMA_GENO}'
+        ped_geno_file = f'{self.base_path}{index}{self.SUFFIX_GENO_PED}'
         causal_file = f'{self.base_path}{index}{self.SUFFIX_CAUSAL}'
-        pheno_file = f'{self.base_path}{index}{self.SUFFIX_EMMA_PHENO}'
+
+        all_snps = json_get(TOTAL_SNPS)
+        all_indices = np.arange(all_snps)
+
+        self.geno_data_pd = pd.read_csv(ped_geno_file, sep='\s+', header=None,engine='c')
+
+        self.process_ped_data(all_snps)
 
         self.causal_snp_data_np = pd.read_csv(causal_file, header=None, sep='\t').to_numpy()
         self.sort_causal_snps()
         causal_indices = self.get_causal_snps_indices_after_sorting()
         n_causal = len(causal_indices)
         
-        all_indices = np.arange(json_get(TOTAL_SNPS))
+    
         non_causal_indices = np.setdiff1d(all_indices, causal_indices)
         if total_samples is None:
             total_samples = n_causal + len(non_causal_indices)
         n_non_causal = total_samples - n_causal
         sampled_non_causal = np.random.choice(non_causal_indices, n_non_causal, replace=False)
         all_sampled_indices = np.concatenate([causal_indices, sampled_non_causal])
+
         np.random.shuffle(all_sampled_indices)
-
-        geno_data_list = []
-        size = 0
-        self.mapped_indices = dict()
-        for i, line in enumerate(open(emma_geno_file)):
-            if i in all_sampled_indices:
-                geno_data_list.append([float(x) if x not in ('', 'NA', 'NaN') else -1 for x in line.strip().split('\t')])
-                self.mapped_indices[i] = size
-                size += 1
-            if len(geno_data_list) == total_samples:
-                break
-        self.geno_data_np = np.array(geno_data_list)
-
-        self.pheno_data_np = pd.read_csv(pheno_file, header=None, sep='\t').to_numpy()
+        
+        self.geno_data_np = self.geno_data_np[all_sampled_indices, :]
 
         self.labels = np.zeros(total_samples, dtype=int)
-        for causal_index in causal_indices:
-            self.labels[self.mapped_indices[causal_index]] = 1
+        
+        for mapped_index, origin_index in enumerate(all_sampled_indices):
+            if origin_index in causal_indices :
+                self.labels[mapped_index] = 1
+        
 
 
 
@@ -183,4 +207,4 @@ class SimulationDataReader:
 
 if __name__ == "__main__":
     data_reader = SimulationDataReader('./simulation/data/', True)
-    data_reader.run(0, 200)
+    data_reader.run(0, 5)

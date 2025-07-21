@@ -5,6 +5,9 @@ import numpy as np
 from genomeToImage import GenomeImage
 from tqdm import tqdm
 import tensorflow as tf
+from sklearn.impute import SimpleImputer
+import os 
+from mylogger import Logger
 
 def json_update(key: str ,param:Any) -> None:
     """
@@ -29,17 +32,47 @@ def json_get(key:str):
 
 
 def createImages(columns, data, sim_indivduals):
-    X_list = []
+    """
+    Transform genomic data into images for CNN input, padding individuals if needed.
+    Optimized for large datasets using vectorized operations and dask.
+
+    Args:
+        columns: Width of the output images.
+        data: Input matrix from calc_avg_vcf, shape (n_variants, n_samples).
+        sim_indivduals: Expected number of individuals (from json_get("samples")).
+
+    Returns:
+        TensorFlow tensor of images, shape (n_variants, rows, columns, 1).
+    """
+
+    logger = Logger('Message:', os.environ['LOGGER'])
+    
+
     individuals = data.shape[1]
-    if individuals  < sim_indivduals:
-        pad = np.zeros((data.shape[0], sim_indivduals - individuals))
+    logger.info(f"Input shape: {data.shape}")
+
+
+    if individuals < sim_indivduals:
+        pad = np.ones((data.shape[0], sim_indivduals - individuals), dtype=np.float32) * -1
         data = np.concatenate((data, pad), axis=1)
+        logger.info(f"Padded to shape: {data.shape}")
+
+    
+
+    data = data.astype(np.float32)
+
+
     rows = int(sim_indivduals / columns)
-    genomeImage = GenomeImage(rows, columns)
-    for sample in tqdm(data, desc="Generating images"):
-        image = genomeImage.transform_to_image(sample)
-        X_list.append(image)  # Append image to the list
-    X = tf.convert_to_tensor(X_list, dtype=tf.float32)  # Adjust dtype if needed
+    logger.info(f"Image dimensions: ({rows}, {columns})")
+   
+
+    logger.info(f"Creating images with dimensions: ({rows}, {columns})")
+    images = data.reshape(-1, rows, columns)  
+
+    X = tf.convert_to_tensor(images, dtype=tf.float32)  
+    X = tf.expand_dims(X, axis=-1) 
+    logger.info(f"Output tensor shape: {X.shape}, dtype: {X.dtype}")
+
     return X
 
 

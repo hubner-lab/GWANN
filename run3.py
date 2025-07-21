@@ -10,6 +10,9 @@ import numpy as np
 import plotly.graph_objects as go
 import allel
 import re
+from sklearn.impute import SimpleImputer
+
+
 def tanh_map(output, scale=10):
     return np.tanh(scale * (output - 0.5))
 
@@ -72,22 +75,19 @@ class Run:
         return callset['calldata/GT'], callset['samples'], callset['variants/CHROM'], pheno 
 
     def calc_avg_vcf(self, vcf_data):
-        """
-        Normalize the genome values to be in {-1.0, 1.0}.
-        The value 0.5 is interpreted according to the `gm` flag:
-            - 'recessive' -> 0
-            - 'dominant'  -> 1
-            - 'additive'  -> 0.5
-            - 'noHet'     -> -1
-        """
-        tmp_vcf = (vcf_data[:, :, 0] + vcf_data[:, :, 1]) / 2
-        if self.gm in self.GeneModel.keys():
-            self.logger.info(f'Assigning Genemodel for {self.gm}={self.GeneModel[self.gm]}')
-            tmp_vcf[np.where(tmp_vcf == 0.5)] = self.GeneModel[self.gm]
-        else:
-            self.logger.error(f"Unknown genetic model: {self.gm}")
-            self.logger.info("Assigning Genmodel to default value 0")
-            tmp_vcf[np.where(tmp_vcf == 0.5)] = 0
+
+        vcf_data = vcf_data.astype(np.float32)
+        # vcf_data[:, :, 0][np.where(vcf_data[:, :, 0] == -1)] = np.nan
+        # vcf_data[:, :, 1][np.where(vcf_data[:, :, 1] == -1)] = np.nan
+        
+        tmp_vcf = vcf_data[:, :, 0] + vcf_data[:, :, 1]
+        # imputer = SimpleImputer(strategy='mean')
+        # tmp_vcf = imputer.fit_transform(tmp_vcf)
+
+        max_val = np.max(np.abs(tmp_vcf))
+        if max_val > 0:  # Avoid division by zero
+            tmp_vcf = tmp_vcf / max_val
+        
         return tmp_vcf
     
     def get_output_modified(self,output, funcName = ""):

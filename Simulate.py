@@ -16,7 +16,7 @@ from mylogger import Logger
 
 class Simulate:
 
-
+    DEPOLIDS = 2
     def __init__(self, SNPs: int, subpop: int, n_samples: int, n_sim: int, causalSNPs: int, maf: float, miss: float, equal: bool, debug: bool, delete: bool):
         """
         Initialize the simulation parameters.
@@ -33,9 +33,10 @@ class Simulate:
             debug (bool): Flag to enable verbose logging for debugging.
             delete (bool): Flag to delete the current simulated files.
         """
+                
         self.SNPs = SNPs
         self.subpop = subpop
-        self.n_samples = n_samples
+        self.n_samples = n_samples * self.DEPOLIDS
         self.n_sim = n_sim
         self.causalSNPs = causalSNPs
         self.maf = maf
@@ -44,17 +45,18 @@ class Simulate:
         self.debug = debug
         self.delete = delete
         self.logger = Logger(f'Message:', f"{os.environ['LOGGER']}")
+        json_update(SAMPLES,n_samples)
+        json_update(SIMULATIONS,n_sim)
+        json_update(TOTAL_SNPS,SNPs)
 
 
     def delete_files_in_directory(self, directory_path):
         if not os.path.exists(directory_path):
-            return  # Nothing to delete if directory doesn't exist
+            return
         for filename in os.listdir(directory_path):
             file_path = os.path.join(directory_path, filename)
-            # Check if it's a file and not .gitignore
             if os.path.isfile(file_path) and filename != '.gitignore':
                 os.remove(file_path)
-                # print(f"Deleted: {filename}")
         
 
     def simulate(self):
@@ -63,23 +65,23 @@ class Simulate:
 
         if self.delete:
             self.delete_files_in_directory(SIM_PATH)
-        
-        json_update(SAMPLES,self.n_samples)
-        json_update(SIMULATIONS,self.n_sim)
-        json_update(TOTAL_SNPS,self.SNPs)
+
         seed_arr = self._seed()
         
         np.random.shuffle(seed_arr)
         
-        # Knowing the number of CPU cores can help you decide how many processes to create for parallel execution.
-        cpus = multiprocessing.cpu_count()
+
         # Create a pool of worker processes to execute tasks concurrently. Here's a breakdown of what it does:
-        pool = multiprocessing.Pool(cpus)
-        self.logger.info(f"Pool of workers created with {cpus} CPU cores.")
+    
         self.logger.info(f"Generating commands...")
         genome_command, phenosim_command, samples_str = self._generate_commands()
         self.logger.info(f"Commands generated with the following parameters:\ngenome_command: {genome_command}\nphenosim_command: {phenosim_command}")
 
+
+        # Knowing the number of CPU cores can help you decide how many processes to create for parallel execution.
+        cpus = multiprocessing.cpu_count()
+        pool = multiprocessing.Pool(cpus)
+        self.logger.info(f"Pool of workers created with {cpus} CPU cores.")
         try:
             self._debug_message1(cpus,samples_str)
             self.logger.info(f"Creating simulations...")
@@ -140,14 +142,14 @@ class Simulate:
     
     def _generate_genome_command(self) -> Tuple[List[str], str]:
         samples_str = self._generate_samples_str()
-        genome_command = shlex.split(f"{GENOME_EXE} -s {self.SNPs} -pop {self.subpop} {samples_str} -seed")
+        genome_command = shlex.split(f"{GENOME_EXE} -c {1} -s {self.SNPs} -pop {self.subpop} {samples_str} -seed")
         return genome_command, samples_str
 
 
     def _generate_phenosim_command(self) -> str:
         phenosim_command = (
             f"python2 simulation/phenosim/phenosim.py -i G "
-            f"-f {SIM_PATH}/genome{{0}}.txt --outfile {SIM_PATH}/{{0}} "
+            f"-d 1 -o P -f {SIM_PATH}/genome{{0}}.txt --outfile {SIM_PATH}/{{0}} "
             f"--maf_r {self.maf},1.0 --maf_c {self.maf} --miss {self.miss}"
         )
         return phenosim_command
