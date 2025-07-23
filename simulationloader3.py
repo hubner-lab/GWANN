@@ -3,7 +3,9 @@ import numpy as np
 from sklearn.manifold import MDS
 from utilities import json_get
 from const import TOTAL_SNPS 
-from sklearn.impute import SimpleImputer
+from scipy.ndimage import laplace
+
+
 class SimulationDataReader:
     ALLELE_MAPPING = {'A': 1, 'T': 0, '0': -1}
     PED_COLUMNS = ['Family_ID', 'Individual_ID', 'Paternal_ID', 'Maternal_ID', 'Sex', 'Phenotype']
@@ -88,23 +90,16 @@ class SimulationDataReader:
 
     def process_ped_data(self, all_snps):
         alleles_columns = [f'allel{i}' for i in range(all_snps*2) ]
-        allele1_columns = alleles_columns[::2]
-        allele2_columns = alleles_columns[1::2]
         self.geno_data_pd.columns = self.PED_COLUMNS + alleles_columns
 
-        matrix1 = self.geno_data_pd[allele1_columns].replace(self.ALLELE_MAPPING).to_numpy()
-        matrix2 = self.geno_data_pd[allele2_columns].replace(self.ALLELE_MAPPING).to_numpy()
+        matrix = self.geno_data_pd[alleles_columns].to_numpy()
+        mapped_matrix = np.vectorize(self.ALLELE_MAPPING.get)(matrix)
+        matrix1 = mapped_matrix[:, ::2]
+        matrix2 = mapped_matrix[:, 1::2]
 
         self.geno_data_np = matrix1 + matrix2
-        # imputer = SimpleImputer(strategy='mean')
-        # self.geno_data_np = imputer.fit_transform(self.geno_data_np)
-
-    
-        max_val = np.max(np.abs(self.geno_data_np))
-        if max_val > 0:  # Avoid division by zero
-            self.geno_data_np = self.geno_data_np / max_val
-        
-        self.geno_data_np = self.geno_data_np .T
+        self.geno_data_np[self.geno_data_np == -2] = -1 
+        self.geno_data_np = (self.geno_data_np.T + 1) * 1/3
 
         self.pheno_data_np = self.geno_data_pd['Phenotype'].to_numpy()
 
@@ -118,10 +113,20 @@ class SimulationDataReader:
         all_snps = json_get(TOTAL_SNPS)
         all_indices = np.arange(all_snps)
 
-        self.geno_data_pd = pd.read_csv(ped_geno_file, sep='\s+', header=None,engine='c')
+
+
+        self.geno_data_pd = pd.read_csv(
+                ped_geno_file,
+                sep='\s+',
+                engine='c',
+                header=None,
+                dtype=str,  # Treat all columns as strings to avoid type issues
+                skip_blank_lines=True,
+                na_values=None,  # Prevent empty strings from being treated as NaN
+                keep_default_na=False
+            )
 
         self.process_ped_data(all_snps)
-
         self.causal_snp_data_np = pd.read_csv(causal_file, header=None, sep='\t').to_numpy()
         self.sort_causal_snps()
         causal_indices = self.get_causal_snps_indices_after_sorting()
@@ -207,4 +212,4 @@ class SimulationDataReader:
 
 if __name__ == "__main__":
     data_reader = SimulationDataReader('./simulation/data/', True)
-    data_reader.run(0, 5)
+    data_reader.run(1, 20)

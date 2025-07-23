@@ -10,7 +10,7 @@ import numpy as np
 import plotly.graph_objects as go
 import allel
 import re
-from sklearn.impute import SimpleImputer
+from scipy.ndimage import laplace
 
 
 def tanh_map(output, scale=10):
@@ -76,18 +76,11 @@ class Run:
 
     def calc_avg_vcf(self, vcf_data):
 
-        vcf_data = vcf_data.astype(np.float32)
-        # vcf_data[:, :, 0][np.where(vcf_data[:, :, 0] == -1)] = np.nan
-        # vcf_data[:, :, 1][np.where(vcf_data[:, :, 1] == -1)] = np.nan
-        
         tmp_vcf = vcf_data[:, :, 0] + vcf_data[:, :, 1]
-        # imputer = SimpleImputer(strategy='mean')
-        # tmp_vcf = imputer.fit_transform(tmp_vcf)
 
-        max_val = np.max(np.abs(tmp_vcf))
-        if max_val > 0:  # Avoid division by zero
-            tmp_vcf = tmp_vcf / max_val
-        
+        tmp_vcf[tmp_vcf == -2] = -1  
+        tmp_vcf = (tmp_vcf + 1) * 1/3
+
         return tmp_vcf
     
     def get_output_modified(self,output, funcName = ""):
