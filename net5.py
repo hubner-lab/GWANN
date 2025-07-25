@@ -9,10 +9,6 @@ class ModelBuilder:
     def build(self):
         matrix_input = Input(shape=(self.height, self.width, 1))
 
-        x = layers.Conv2D(8, kernel_size=(3, 3), activation='relu', padding='same')(matrix_input)
-        x = layers.BatchNormalization()(x)
-        x = layers.MaxPooling2D(pool_size=(2, 2))(x)
-
         x = layers.Conv2D(16, kernel_size=(3, 3), activation='relu', padding='same')(matrix_input)
         x = layers.BatchNormalization()(x)
         x = layers.MaxPooling2D(pool_size=(2, 2))(x)

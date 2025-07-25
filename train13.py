@@ -10,6 +10,8 @@ from tensorflow.keras.utils import to_categorical
 from tensorflow.keras.callbacks import ModelCheckpoint, ReduceLROnPlateau, EarlyStopping
 from tensorflow.keras.optimizers import SGD
 from sklearn.metrics import precision_score, recall_score, f1_score, average_precision_score
+import matplotlib.pyplot as plt
+from TrainingVisualizer import TrainingVisualizer
 
 class Train:
     def __init__(self, model_name:str, total_simulations:int, sampledSitesIncludeCausals: int, columns:int,
@@ -21,6 +23,7 @@ class Train:
         self.epochs = epochs
         self.test_ratio = test_ratio
         self.logger = Logger(f'Message:', f"{os.environ['LOGGER']}")
+    
 
     def data_splitter(self):
         return train_test_split(
@@ -29,6 +32,7 @@ class Train:
             test_size=self.test_ratio,
             random_state=42
         )
+
 
     def run(self):
         self.logger.info("Starting training process...")
@@ -56,7 +60,7 @@ class Train:
         modelBuilder = ModelBuilder(self.height, self.width)
         model = modelBuilder.model_summary()
         
-        model.compile(optimizer=SGD(learning_rate=0.01, momentum=0.9), loss='categorical_crossentropy', metrics=['accuracy'])
+        model.compile(optimizer=SGD(learning_rate=0.001, momentum=0.9), loss='categorical_crossentropy', metrics=['accuracy'])
         X_train = np.expand_dims(X_train, -1)
         X_test = np.expand_dims(X_test, -1)
 
@@ -86,7 +90,7 @@ class Train:
             verbose=1
         )
 
-        model.fit(X_train, y_train, 
+        history = model.fit(X_train, y_train, 
                 validation_data=(X_test, y_test),
                   epochs=self.epochs, 
                   batch_size=self.batch_size, 
@@ -117,6 +121,15 @@ class Train:
         self.logger.info(f'F1-score: {f1:.4f}')
         self.logger.info(f'AUC-PR (Precision-Recall): {auc_pr:.4f}')
         self.logger.info("Model training completed successfully.")
+        
+                # Visualizer - plot the history
+        visualizer = TrainingVisualizer('./metrics')  # instantiate the visualizer
+
+        # Plot and save the plots
+        visualizer.plot_history(history)  # Plot training/validation loss/accuracy
+        visualizer.plot_confusion_matrix(y_test_labels, y_pred_labels)  # Confusion Matrix
+        visualizer.plot_precision_recall(y_test[:, 1], y_pred_probs[:, 1])  # Precision-Recall curve
+        visualizer.plot_roc_curve(y_test[:, 1], y_pred_probs[:, 1])  # ROC curve
 
 
 if __name__ == '__main__':
