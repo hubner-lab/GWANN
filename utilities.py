@@ -53,7 +53,7 @@ def createImages(columns, data, sim_indivduals):
 
 
     if individuals < sim_indivduals:
-        pad = np.full((data.shape[0], sim_indivduals - individuals), -1) 
+        pad = np.full((data.shape[0], sim_indivduals - individuals), 0) 
         data = np.concatenate((data, pad), axis=1)
         logger.info(f"Padded to shape: {data.shape}")
 
