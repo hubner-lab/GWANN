@@ -8,10 +8,11 @@ from utilities import json_update
 from net5 import ModelBuilder  # assuming net3 is updated with softmax support
 from tensorflow.keras.utils import to_categorical
 from tensorflow.keras.callbacks import ModelCheckpoint, ReduceLROnPlateau, EarlyStopping
-from tensorflow.keras.optimizers import SGD
+from tensorflow.keras.optimizers import SGD, Adam
 from sklearn.metrics import precision_score, recall_score, f1_score, average_precision_score
-import matplotlib.pyplot as plt
 from TrainingVisualizer import TrainingVisualizer
+from sklearn.utils import class_weight
+
 
 class Train:
     def __init__(self, model_name:str, total_simulations:int, sampledSitesIncludeCausals: int, columns:int,
@@ -26,12 +27,23 @@ class Train:
     
 
     def data_splitter(self):
-        return train_test_split(
+        # First split into train and temp (which will be split into val and test)
+        X_train, X_temp, y_train, y_temp = train_test_split(
             self.dataset.X.numpy(),
             self.dataset.y.numpy(),
-            test_size=self.test_ratio,
+            test_size=self.test_ratio + 0.1, 
             random_state=42
         )
+
+        val_ratio = 0.5  
+        X_val, X_test, y_val, y_test = train_test_split(
+            X_temp,
+            y_temp,
+            test_size=val_ratio,
+            random_state=42
+        )
+
+        return X_train, X_val, X_test, y_train, y_val, y_test
 
 
     def run(self):
@@ -41,15 +53,22 @@ class Train:
         self.logger.info("Data loaded successfully.") 
         self.logger.info("Splitting data into training and testing sets...")
 
-        X_train, X_test, y_train, y_test = self.data_splitter()
+        X_train, X_val, X_test, y_train, y_val, y_test = self.data_splitter()
 
         self.logger.debug(f"y_train True labels: {len(y_train[y_train == 1]) }")
         self.logger.debug(f"y_train False labels: {len(y_train[y_train == 0]) }")
         self.logger.debug(f"y_test True labels: {len(y_test[y_test == 1]) }")
         self.logger.debug(f"y_test False labels: {len(y_test[y_test == 0]) }")
+        self.logger.debug(f"y_val True labels: {len(y_val[y_val == 1]) }")
+        self.logger.debug(f"y_val False labels: {len(y_val[y_val == 0]) }")
 
         y_train = to_categorical(y_train, 2)
         y_test = to_categorical(y_test, 2)
+        y_val = to_categorical(y_val, 2)
+
+        X_train = np.expand_dims(X_train, -1)
+        X_test = np.expand_dims(X_test, -1)
+        X_val = np.expand_dims(X_val, -1)
 
         self.logger.debug(f"Data split into {len(X_train)} training samples and {len(X_test)} testing samples.")
         self.logger.info("Data split successfully.")
@@ -60,11 +79,17 @@ class Train:
         modelBuilder = ModelBuilder(self.height, self.width)
         model = modelBuilder.model_summary()
         
-        model.compile(optimizer=SGD(learning_rate=0.001, momentum=0.9), loss='categorical_crossentropy', metrics=['accuracy'])
-        X_train = np.expand_dims(X_train, -1)
-        X_test = np.expand_dims(X_test, -1)
+        model.compile(optimizer=Adam(learning_rate=0.001), loss='categorical_crossentropy', metrics=['accuracy'])
 
+     
         self.logger.info("Training model...")
+
+        y_train_labels = np.argmax(y_train, axis=1)
+
+     
+        weights = class_weight.compute_class_weight(class_weight='balanced', classes=np.unique(y_train_labels), y=y_train_labels)
+        class_weights = dict(enumerate(weights))
+        self.logger.info(f"Class weights: {class_weights}")
 
         checkpoint_cb = ModelCheckpoint(
             filepath=f"{MODEL_PATH_TENSOR_DIR}/{self.model_name}_best.h5",
@@ -91,10 +116,11 @@ class Train:
         )
 
         history = model.fit(X_train, y_train, 
-                validation_data=(X_test, y_test),
+                validation_data=(X_val, y_val),
                   epochs=self.epochs, 
                   batch_size=self.batch_size, 
                   callbacks=[checkpoint_cb, early_stopping_cb, lr_scheduler],
+                  class_weight=class_weights,
                   verbose=1)
 
         json_update("model_name", f"{MODEL_PATH_TENSOR_DIR}/{self.model_name}.h5")
@@ -106,7 +132,7 @@ class Train:
         self.logger.info(f'Test loss: {test_loss}')
         self.logger.info(f'Test accuracy: {test_acc}')
 
-        # Predict and calculate PR metrics
+  
         y_pred_probs = model.predict(X_test)
         y_pred_labels = np.argmax(y_pred_probs, axis=1)
         y_test_labels = np.argmax(y_test, axis=1)
@@ -121,15 +147,12 @@ class Train:
         self.logger.info(f'F1-score: {f1:.4f}')
         self.logger.info(f'AUC-PR (Precision-Recall): {auc_pr:.4f}')
         self.logger.info("Model training completed successfully.")
-        
-                # Visualizer - plot the history
-        visualizer = TrainingVisualizer('./metrics')  # instantiate the visualizer
 
-        # Plot and save the plots
-        visualizer.plot_history(history)  # Plot training/validation loss/accuracy
-        visualizer.plot_confusion_matrix(y_test_labels, y_pred_labels)  # Confusion Matrix
-        visualizer.plot_precision_recall(y_test[:, 1], y_pred_probs[:, 1])  # Precision-Recall curve
-        visualizer.plot_roc_curve(y_test[:, 1], y_pred_probs[:, 1])  # ROC curve
+        visualizer = TrainingVisualizer('./metrics')  
+        visualizer.plot_history(history) 
+        visualizer.plot_confusion_matrix(y_test_labels, y_pred_labels)
+        visualizer.plot_precision_recall(y_test[:, 1], y_pred_probs[:, 1]) 
+        visualizer.plot_roc_curve(y_test[:, 1], y_pred_probs[:, 1])
 
 
 if __name__ == '__main__':

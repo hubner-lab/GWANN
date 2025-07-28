@@ -184,17 +184,17 @@ class Run:
         fig.update_layout(
             title="Prediction of SNPs associated with the trait.",
             xaxis=dict(tickmode='array', tickvals=x_ticks, ticktext=x_tick_labels, title="Chromosome"),
-            yaxis=dict(title="Prediction(%)", range=[self.th, 100]),
+            yaxis=dict(title="Prediction(%)", range=[0, 100]),
             showlegend=True,
             shapes=[
                 dict(
                     type='line',
                     x0=0,
                     x1=current_position,  # spans the full x-axis range aligned with chromosomes
-                    y0=50,
-                    y1=50,
+                    y0=self.th,
+                    y1=self.th,
                     line=dict(color='green', width=2, dash='dash'),
-                    name="50% Threshold Line"
+                    name=f"{self.th} Threshold Line"
                 )
             ],
             updatemenus=[
@@ -242,7 +242,7 @@ class Run:
 
 
         output = self.load_model_and_predict(sorted_vcf, self.func)
-        causal_snps = len(np.where(output/100 > 0.5)[0])
+        causal_snps = len(np.where(output/100 >self.th/100.0)[0])
         percentage = causal_snps/len(output)
         print(f'Causal SNPs(%):{100*percentage}')
         self.plot_data(chrom, output)
