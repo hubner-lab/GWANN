@@ -62,7 +62,7 @@ class Train:
         self.logger.debug(f"y_val False labels: {len(y_val[y_val == 0]) }")
 
 
-        class_weights = {0:10, 1:100}
+        class_weights = {0:50, 1:200}
 
         self.logger.info(f"Class weights: {class_weights}")
         
@@ -83,7 +83,7 @@ class Train:
         modelBuilder = ModelBuilder(self.height, self.width)
         model = modelBuilder.model_summary()
         
-        model.compile(optimizer=Adam(learning_rate=0.0001), loss='categorical_crossentropy', metrics=['accuracy'])
+        model.compile(optimizer=Adam(learning_rate=0.001), loss='categorical_crossentropy', metrics=['accuracy'])
 
      
         self.logger.info("Training model...")
