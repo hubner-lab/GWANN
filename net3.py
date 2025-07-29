@@ -13,9 +13,9 @@ class ModelBuilder:
         x = layers.Conv2D(5, kernel_size=(2, 2), activation='relu')(x)
         x = layers.MaxPooling2D(pool_size=(2, 2))(x)
         x = layers.Conv2D(10, kernel_size=(2, 2), activation='relu')(x)
-        x = layers.Flatten()(x)
         x = layers.Dense(10)(x)
         x = layers.Dropout(rate=0.2)(x)
+        x = layers.Flatten()(x)
         output = layers.Dense(2, activation='softmax')(x)
 
         return Model(inputs=matrix_input, outputs=output)

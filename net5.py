@@ -12,14 +12,14 @@ class ModelBuilder:
         matrix_input = Input(shape=(self.height, self.width, 1))
 
         # First Conv Block
-        x = layers.Conv2D(16, kernel_size=(3, 3), activation='tanh', padding='same',
+        x = layers.Conv2D(16, kernel_size=(3, 3), activation='relu', padding='same',
                           kernel_regularizer=l2_reg, bias_regularizer=l2_reg)(matrix_input)
         x = layers.BatchNormalization()(x)
         x = layers.Dropout(0.3)(x)
         x = layers.MaxPooling2D(pool_size=(2, 2))(x)
 
         # Second Conv Block
-        x = layers.Conv2D(32, kernel_size=(3, 3), activation='tanh', padding='same',
+        x = layers.Conv2D(32, kernel_size=(3, 3), activation='relu', padding='same',
                           kernel_regularizer=l2_reg, bias_regularizer=l2_reg)(x)
         x = layers.BatchNormalization()(x)
         x = layers.Dropout(0.3)(x)

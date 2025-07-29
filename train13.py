@@ -11,7 +11,6 @@ from tensorflow.keras.callbacks import ModelCheckpoint, ReduceLROnPlateau, Early
 from tensorflow.keras.optimizers import SGD, Adam
 from sklearn.metrics import precision_score, recall_score, f1_score, average_precision_score
 from TrainingVisualizer import TrainingVisualizer
-from sklearn.utils import class_weight
 
 
 class Train:
@@ -62,6 +61,11 @@ class Train:
         self.logger.debug(f"y_val True labels: {len(y_val[y_val == 1]) }")
         self.logger.debug(f"y_val False labels: {len(y_val[y_val == 0]) }")
 
+
+        class_weights = {0:10, 1:100}
+
+        self.logger.info(f"Class weights: {class_weights}")
+        
         y_train = to_categorical(y_train, 2)
         y_test = to_categorical(y_test, 2)
         y_val = to_categorical(y_val, 2)
@@ -79,17 +83,12 @@ class Train:
         modelBuilder = ModelBuilder(self.height, self.width)
         model = modelBuilder.model_summary()
         
-        model.compile(optimizer=Adam(learning_rate=0.001), loss='categorical_crossentropy', metrics=['accuracy'])
+        model.compile(optimizer=Adam(learning_rate=0.0001), loss='categorical_crossentropy', metrics=['accuracy'])
 
      
         self.logger.info("Training model...")
+        
 
-        y_train_labels = np.argmax(y_train, axis=1)
-
-     
-        weights = class_weight.compute_class_weight(class_weight='balanced', classes=np.unique(y_train_labels), y=y_train_labels)
-        class_weights = dict(enumerate(weights))
-        self.logger.info(f"Class weights: {class_weights}")
 
         checkpoint_cb = ModelCheckpoint(
             filepath=f"{MODEL_PATH_TENSOR_DIR}/{self.model_name}_best.h5",
