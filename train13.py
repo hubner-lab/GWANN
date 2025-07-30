@@ -62,7 +62,7 @@ class Train:
         self.logger.debug(f"y_val False labels: {len(y_val[y_val == 0]) }")
 
 
-        class_weights = {0:50, 1:200}
+        # class_weights = {0:1, 1:1000}
 
         self.logger.info(f"Class weights: {class_weights}")
         
@@ -119,7 +119,7 @@ class Train:
                   epochs=self.epochs, 
                   batch_size=self.batch_size, 
                   callbacks=[checkpoint_cb, early_stopping_cb, lr_scheduler],
-                  class_weight=class_weights,
+                #   class_weight=class_weights,
                   verbose=1)
 
         json_update("model_name", f"{MODEL_PATH_TENSOR_DIR}/{self.model_name}.h5")
