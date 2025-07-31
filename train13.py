@@ -5,7 +5,7 @@ from const import MODEL_PATH_TENSOR_DIR
 from mylogger import Logger
 import os 
 from utilities import json_update
-from net5 import ModelBuilder  # assuming net3 is updated with softmax support
+from net3 import ModelBuilder  # assuming net3 is updated with softmax support
 from tensorflow.keras.utils import to_categorical
 from tensorflow.keras.callbacks import ModelCheckpoint, ReduceLROnPlateau, EarlyStopping
 from tensorflow.keras.optimizers import SGD, Adam
@@ -30,7 +30,7 @@ class Train:
         X_train, X_temp, y_train, y_temp = train_test_split(
             self.dataset.X.numpy(),
             self.dataset.y.numpy(),
-            test_size=self.test_ratio + 0.1, 
+            test_size=self.test_ratio, 
             random_state=42
         )
 
@@ -62,7 +62,7 @@ class Train:
         self.logger.debug(f"y_val False labels: {len(y_val[y_val == 0]) }")
 
 
-        # class_weights = {0:1, 1:1000}
+        class_weights = {0:1, 1:1}
 
         self.logger.info(f"Class weights: {class_weights}")
         
@@ -83,7 +83,7 @@ class Train:
         modelBuilder = ModelBuilder(self.height, self.width)
         model = modelBuilder.model_summary()
         
-        model.compile(optimizer=Adam(learning_rate=0.001), loss='categorical_crossentropy', metrics=['accuracy'])
+        model.compile(optimizer=SGD(learning_rate=0.0001), loss='categorical_crossentropy', metrics=['accuracy'])
 
      
         self.logger.info("Training model...")
