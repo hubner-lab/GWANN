@@ -36,7 +36,7 @@ def log_map(output):
 
 class Run:
     GeneModel = {'recessive':0,'dominant':1,'additive':0.5,'noHet':-1}
-    def __init__(self,vcf, pheno_path, trait,model, output_path, cpu, func, th, gm):
+    def __init__(self,vcf, pheno_path, trait,model, output_path, cpu, func, th):
         self.vcf = vcf
         self.pheno_path = pheno_path
         self.trait = trait
@@ -48,7 +48,6 @@ class Run:
         self.logger = Logger(f'Message:', f"{os.environ['LOGGER']}")
         self.func = func
         self.th = th
-        self.gm = gm
 
 
     def load_and_parse_data(self):

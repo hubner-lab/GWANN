@@ -8,6 +8,7 @@ config*/
 ../GWANN_2/vcf_data/
 vcf_data/
 *.sh
+metrics/*
 .vscode/
 genom
 Temp/
@@ -40,4 +41,3 @@ simulation/data/
 results/*
 vcf_data
 logs/*
-metrics/

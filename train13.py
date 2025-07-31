@@ -83,7 +83,7 @@ class Train:
         modelBuilder = ModelBuilder(self.height, self.width)
         model = modelBuilder.model_summary()
         
-        model.compile(optimizer=SGD(learning_rate=0.0001), loss='categorical_crossentropy', metrics=['accuracy'])
+        model.compile(optimizer=Adam(learning_rate=0.0005), loss='categorical_crossentropy', metrics=['accuracy'])
 
      
         self.logger.info("Training model...")
