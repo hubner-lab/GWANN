@@ -11,7 +11,8 @@ from tensorflow.keras.callbacks import ModelCheckpoint, ReduceLROnPlateau, Early
 from tensorflow.keras.optimizers import SGD, Adam
 from sklearn.metrics import precision_score, recall_score, f1_score, average_precision_score
 from TrainingVisualizer import TrainingVisualizer
-
+from sklearn.metrics import matthews_corrcoef
+from keras_lr_finder import LRFinder
 
 class Train:
     def __init__(self, model_name:str, total_simulations:int, sampledSitesIncludeCausals: int, columns:int,
@@ -83,7 +84,8 @@ class Train:
         modelBuilder = ModelBuilder(self.height, self.width)
         model = modelBuilder.model_summary()
         
-        model.compile(optimizer=Adam(learning_rate=0.0005), loss='categorical_crossentropy', metrics=['accuracy'])
+        learning_rate = 0.01
+        model.compile(optimizer=Adam(learning_rate=learning_rate), loss='categorical_crossentropy', metrics=['accuracy'])
 
      
         self.logger.info("Training model...")
@@ -147,7 +149,10 @@ class Train:
         self.logger.info(f'AUC-PR (Precision-Recall): {auc_pr:.4f}')
         self.logger.info("Model training completed successfully.")
 
-        visualizer = TrainingVisualizer('./metrics')  
+        mcc = matthews_corrcoef(y_test_labels, y_pred_labels)
+        self.logger.info(f'Matthews Correlation Coefficient: {mcc:.4f}')
+
+        visualizer = TrainingVisualizer(f'./metrics/{self.batch_size}_{learning_rate}')  
         visualizer.plot_history(history) 
         visualizer.plot_confusion_matrix(y_test_labels, y_pred_labels)
         visualizer.plot_precision_recall(y_test[:, 1], y_pred_probs[:, 1]) 

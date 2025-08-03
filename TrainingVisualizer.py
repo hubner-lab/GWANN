@@ -1,4 +1,5 @@
 import matplotlib.pyplot as plt
+import os
 from sklearn.metrics import (
     confusion_matrix, ConfusionMatrixDisplay,
     precision_recall_curve, roc_curve, auc
@@ -8,6 +9,7 @@ import numpy as np
 class TrainingVisualizer:
     def __init__(self, save_dir="./"):
         self.save_dir = save_dir
+        os.makedirs(self.save_dir, exist_ok=True)
 
     def plot_history(self, history):
         plt.figure(figsize=(12, 5))
