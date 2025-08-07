@@ -69,3 +69,58 @@ class TrainingVisualizer:
         plt.legend()
         plt.savefig(f"{self.save_dir}/roc_curve.png")
         plt.close()
+        
+    def plot_learning_rate(self, history):
+        if 'lr' not in history.history:
+            print("Learning rate history not found in training history.")
+            return
+
+        plt.figure()
+        plt.plot(history.history['lr'], label='Learning Rate')
+        plt.title('Learning Rate Schedule')
+        plt.xlabel('Epoch')
+        plt.ylabel('Learning Rate')
+        plt.grid(True)
+        plt.legend()
+        plt.savefig(f"{self.save_dir}/learning_rate.png")
+        plt.close()
+    
+    def plot_full_history(self, history):
+        has_lr = 'lr' in history.history
+        n_subplots = 3 if has_lr else 2
+
+        plt.figure(figsize=(15, 5))
+
+        # Accuracy
+        plt.subplot(1, n_subplots, 1)
+        plt.plot(history.history['accuracy'], label='Train Acc')
+        plt.plot(history.history['val_accuracy'], label='Val Acc')
+        plt.title('Model Accuracy')
+        plt.xlabel('Epoch')
+        plt.ylabel('Accuracy')
+        plt.legend()
+        plt.grid(True)
+
+        # Loss
+        plt.subplot(1, n_subplots, 2)
+        plt.plot(history.history['loss'], label='Train Loss')
+        plt.plot(history.history['val_loss'], label='Val Loss')
+        plt.title('Model Loss')
+        plt.xlabel('Epoch')
+        plt.ylabel('Loss')
+        plt.legend()
+        plt.grid(True)
+
+        # Learning Rate (if available)
+        if has_lr:
+            plt.subplot(1, n_subplots, 3)
+            plt.plot(history.history['lr'], label='Learning Rate')
+            plt.title('Learning Rate')
+            plt.xlabel('Epoch')
+            plt.ylabel('LR')
+            plt.legend()
+            plt.grid(True)
+
+        plt.tight_layout()
+        plt.savefig(f"{self.save_dir}/full_training_history.png")
+        plt.close()

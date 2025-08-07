@@ -147,7 +147,8 @@ class CLIManager:
     @click.option('-M', '--MN', 'model_name', required=True, type=str, help="Model name to be saved")
     @click.option('-e', '--epochs', 'epochs', default=100, type=int, help="Number of training iterations")
     @click.option('-S', '--SNPs', 'n_snps', required=True, type=int, help="Number of SNP sites to be randomly sampled per batch")
-    @click.option('-b', '--batch', 'batch', default=20, type=int, help="Batch size")
+    @click.option('-b', '--batch', 'batch', default=64, type=int, help="Batch size")
+    @click.option('-l', '--lrate', 'lr', default=64, type=int, help="learning rate for the model")
     @click.option('-r', '--ratio', 'ratio', default=0.8, type=float, help="Train / eval ratio")
     @click.option('-w', '--width', 'width', default=15, type=int, help="Image width must be a divisor of the number of individuals")
     @click.option('--path', 'sim_path', required=True, type=str, help="Path to the simulated data")
@@ -158,7 +159,8 @@ class CLIManager:
         n_snps: int, 
         batch: int, 
         ratio: float, 
-        width: int, 
+        width: int,
+        lr: float,
         sim_path: str,
         mds,
     ) -> None:
@@ -185,9 +187,11 @@ class CLIManager:
         start_time = time.time()
         LOGGER_FILE = "train"
         os.environ['LOGGER'] = f'{LOGGER_DIR}/{LOGGER_FILE}_{datetime.datetime.now().strftime("%Y-%m-%d_%H-%M-%S")}.log'
-        Logger(f'Message:', f"{os.environ['LOGGER']}").debug(f"Training with {epochs} epochs, {n_snps} sampled SNPs, batch size {batch}, ratio {ratio}, width {width}, path {sim_path}, model name {model_name}, mds: {mds}")
+        Logger(
+            f'Message:',
+            f"{os.environ['LOGGER']}").debug(f"Training with {epochs} epochs, {n_snps} sampled-SNPs, batch-size: {batch}, ratio: {ratio}, width: {width}, path: {sim_path}, model-name: {model_name}, mds: {mds}, lr: {lr}")
         total_simulations = json_get(SIMULATIONS)
-        Train(model_name, total_simulations, n_snps, width, batch, epochs,mds, sim_path, ratio).run()
+        Train(model_name, total_simulations, n_snps, width, batch,lr ,epochs,mds, sim_path, ratio).run()
         log_resource_usage(start_time,Logger(f'Message:', f"{os.environ['LOGGER']}"), "Train")
         
 

@@ -2,10 +2,7 @@ from const import JSON_FILE, current_dict
 import json 
 from typing import Any
 import numpy as np 
-from genomeToImage import GenomeImage
-from tqdm import tqdm
 import tensorflow as tf
-from sklearn.impute import SimpleImputer
 import os 
 from mylogger import Logger
 

@@ -5,20 +5,25 @@ from const import MODEL_PATH_TENSOR_DIR
 from mylogger import Logger
 import os 
 from utilities import json_update
-from net3 import ModelBuilder  # assuming net3 is updated with softmax support
+from net5 import ModelBuilder  # assuming net3 is updated with softmax support
 from tensorflow.keras.utils import to_categorical
 from tensorflow.keras.callbacks import ModelCheckpoint, ReduceLROnPlateau, EarlyStopping
 from tensorflow.keras.optimizers import SGD, Adam
 from sklearn.metrics import precision_score, recall_score, f1_score, average_precision_score
 from TrainingVisualizer import TrainingVisualizer
 from sklearn.metrics import matthews_corrcoef
-from keras_lr_finder import LRFinder
+import random
+import tensorflow as tf
 
+random.seed(42)
+np.random.seed(42)
+tf.random.set_seed(42)
 class Train:
-    def __init__(self, model_name:str, total_simulations:int, sampledSitesIncludeCausals: int, columns:int,
-                 batch_size:int, epochs:int,mds:bool, simPath: str = "./simulation/data/", test_ratio:float = 0.2):
+    def __init__(self, model_name:str, total_simulations:int, sampledSitesIncludeCausals: int, columns:int, learning_rate:float = 0.01,
+                 batch_size:int = 64, epochs:int = 1000,mds:bool = False, simPath: str = "./simulation/data/", test_ratio:float = 0.2):
 
         self.model_name = model_name
+        self.learning_rate = learning_rate
         self.dataset = Dataset(total_simulations, sampledSitesIncludeCausals,columns,mds, simPath)
         self.batch_size = batch_size
         self.epochs = epochs
@@ -83,7 +88,8 @@ class Train:
 
         modelBuilder = ModelBuilder(self.height, self.width)
         model = modelBuilder.model_summary()
-        
+
+
         learning_rate = 0.01
         model.compile(optimizer=Adam(learning_rate=learning_rate), loss='categorical_crossentropy', metrics=['accuracy'])
 
@@ -152,11 +158,11 @@ class Train:
         mcc = matthews_corrcoef(y_test_labels, y_pred_labels)
         self.logger.info(f'Matthews Correlation Coefficient: {mcc:.4f}')
 
-        visualizer = TrainingVisualizer(f'./metrics/{self.batch_size}_{learning_rate}')  
-        visualizer.plot_history(history) 
+        visualizer = TrainingVisualizer(f'./metrics/{self.batch_size}_{learning_rate}_{self.dataset.sampledSitesIncludeCausals}')  
         visualizer.plot_confusion_matrix(y_test_labels, y_pred_labels)
         visualizer.plot_precision_recall(y_test[:, 1], y_pred_probs[:, 1]) 
         visualizer.plot_roc_curve(y_test[:, 1], y_pred_probs[:, 1])
+        visualizer.plot_full_history(history)
 
 
 if __name__ == '__main__':
