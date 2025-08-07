@@ -51,7 +51,6 @@ class CLIManager:
     @click.option('-t', '--trait','trait',required=True,help='name of the trait (header in the phenotype file)')
     @click.option('--model','model',default=None,help="path to the network model generated in the training step")
     @click.option('--output','output_path',default="results/GWAS",help="prefix of output plot and causative SNPs indexes in the VCF")
-    @click.option('--cpu/;','cpu',default=False,required=False,help="force on cpu")
     @click.option('--transform', '--f', 'func', default="", type=str, help="The name of the function to modify the output (tanh_map, logit_map, log_map)")
     @click.option('--threshold', '--th', 'th', default=50, type=int, help="Causal classification if  >= threshold (% Prediction)")
     def run(
@@ -60,7 +59,6 @@ class CLIManager:
         trait:str,
         model:str,
         output_path:str,
-        cpu:bool,
         func:str,
         th:int,
         )-> None:
@@ -88,7 +86,7 @@ class CLIManager:
         LOGGER_FILE = "run"
         os.environ['LOGGER'] = f'{LOGGER_DIR}/{LOGGER_FILE}_{datetime.datetime.now().strftime("%Y-%m-%d_%H-%M-%S")}.log'
         Logger(f'Message:', f"{os.environ['LOGGER']}").debug(f"Running GWANN analysis with VCF: {vcf}, phenotype path: {pheno_path}, trait: {trait}, model: {modelPath}, output path: {output_path}, threshold: {th}, function: {func}")
-        Run(vcf, pheno_path, trait, modelPath, output_path, cpu, func, th).start()
+        Run(vcf, pheno_path, trait, modelPath, output_path, func, th).start()
         log_resource_usage(start_time,Logger(f'Message:', f"{os.environ['LOGGER']}"),"Run")
         pass
 
@@ -148,8 +146,8 @@ class CLIManager:
     @click.option('-e', '--epochs', 'epochs', default=100, type=int, help="Number of training iterations")
     @click.option('-S', '--SNPs', 'n_snps', required=True, type=int, help="Number of SNP sites to be randomly sampled per batch")
     @click.option('-b', '--batch', 'batch', default=64, type=int, help="Batch size")
-    @click.option('-l', '--lrate', 'lr', default=64, type=int, help="learning rate for the model")
-    @click.option('-r', '--ratio', 'ratio', default=0.8, type=float, help="Train / eval ratio")
+    @click.option('-l', '--lrate', 'lr', default=0.01, type=float, help="learning rate for the model")
+    @click.option('-r', '--ratio', 'ratio', default=0.8, type=float, help="Train/Test ratio")
     @click.option('-w', '--width', 'width', default=15, type=int, help="Image width must be a divisor of the number of individuals")
     @click.option('--path', 'sim_path', required=True, type=str, help="Path to the simulated data")
     @click.option('--mds', 'mds', default=False,is_flag=True, type=bool, help="Apply mds transformation on the phenotype matrix, add TN to avoid population structure")

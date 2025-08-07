@@ -36,13 +36,12 @@ def log_map(output):
 
 class Run:
     GeneModel = {'recessive':0,'dominant':1,'additive':0.5,'noHet':-1}
-    def __init__(self,vcf, pheno_path, trait,model, output_path, cpu, func, th):
+    def __init__(self,vcf, pheno_path, trait,model, output_path,func, th):
         self.vcf = vcf
         self.pheno_path = pheno_path
         self.trait = trait
         self.model_path = model
         self.output_path = output_path
-        self.cpu = cpu
         self.width = json_get("width")
         self.sim_indivduals = json_get("samples")
         self.logger = Logger(f'Message:', f"{os.environ['LOGGER']}")

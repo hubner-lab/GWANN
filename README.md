@@ -1,8 +1,9 @@
 ## Table of contents
 - [Create Virtual Environment (Optional)](#create-virtual-environment-optional)
 - [Go into the repository](#go-into-the-repository)
-- [Temporary (Later will be removed)](#temporary-later-will-be-removed)
-- [Install dependencies](#install-dependencies)
+- [Install python dependencies](#install-python-dependencies)
+- [Install geno command](#install-geno-command)
+- [Install real data to test GWANN (Optional)](#install-real-data-to-test-gwann-optional)
   - [Example](#example)
   - [Usage](#usage)
   - [Net](#net)
@@ -122,7 +123,8 @@ Options:
   -S, --SNPs INTEGER    Number of SNP sites to be randomly sampled per simulation
                         [required]
   -b, --batch INTEGER   Batch size
-  -r, --ratio FLOAT     Train / eval ratio
+  -l, --lrate float     learning rate for the model
+  -r, --ratio FLOAT     Train/Test ratio
   -w, --width INTEGER   Image width must be a divisor of the number of
                         individuals
   --path TEXT           Path to the simulated data  [required]
@@ -146,11 +148,9 @@ Options:
                              training step
   --output TEXT              prefix of output plot and causative SNPs indexes
                              in the VCF
-  --cpu / ;                  force on cpu
   --transform, --f TEXT      The name of the function to modify the output
                              (tanh_map, logit_map, log_map)
-  --threshold, --th INTEGER  Plot resolution begin from this threshold (%
-                             Prediction)
+  --threshold, --th INTEGER  Causal classification if  >= threshold (% Prediction))
   --help                     Show this message and exit
 ```
 

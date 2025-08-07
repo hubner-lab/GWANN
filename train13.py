@@ -19,8 +19,12 @@ random.seed(42)
 np.random.seed(42)
 tf.random.set_seed(42)
 class Train:
-    def __init__(self, model_name:str, total_simulations:int, sampledSitesIncludeCausals: int, columns:int, learning_rate:float = 0.01,
-                 batch_size:int = 64, epochs:int = 1000,mds:bool = False, simPath: str = "./simulation/data/", test_ratio:float = 0.2):
+    def __init__(self, model_name:str, total_simulations:int,
+                sampledSitesIncludeCausals: int, columns:int,
+                batch_size:int = 64, learning_rate:float = 0.01,
+                epochs:int = 1000,mds:bool = False, 
+                simPath:str = "./simulation/data/",test_ratio:float = 0.2
+                ):
 
         self.model_name = model_name
         self.learning_rate = learning_rate
@@ -89,9 +93,8 @@ class Train:
         modelBuilder = ModelBuilder(self.height, self.width)
         model = modelBuilder.model_summary()
 
-
-        learning_rate = 0.01
-        model.compile(optimizer=Adam(learning_rate=learning_rate), loss='categorical_crossentropy', metrics=['accuracy'])
+        self.logger.info(f'Setting model learning rate to: {self.learning_rate}')
+        model.compile(optimizer=Adam(learning_rate=self.learning_rate), loss='categorical_crossentropy', metrics=['accuracy'])
 
      
         self.logger.info("Training model...")
@@ -158,7 +161,7 @@ class Train:
         mcc = matthews_corrcoef(y_test_labels, y_pred_labels)
         self.logger.info(f'Matthews Correlation Coefficient: {mcc:.4f}')
 
-        visualizer = TrainingVisualizer(f'./metrics/{self.batch_size}_{learning_rate}_{self.dataset.sampledSitesIncludeCausals}')  
+        visualizer = TrainingVisualizer(f'./metrics/{self.batch_size}_{self.learning_rate}_{self.dataset.sampledSitesIncludeCausals}')  
         visualizer.plot_confusion_matrix(y_test_labels, y_pred_labels)
         visualizer.plot_precision_recall(y_test[:, 1], y_pred_probs[:, 1]) 
         visualizer.plot_roc_curve(y_test[:, 1], y_pred_probs[:, 1])
