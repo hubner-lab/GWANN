@@ -3,34 +3,99 @@ import numpy as np
 from PIL import Image
 import matplotlib.pyplot as plt
 import os
+from selenium import webdriver
+from pathlib import Path
+import argparse
+class Screenshot:
+    def __init__(self, url, output_path):
+        self.url = Path(url).absolute().as_uri()
+        self.output_path = output_path
+    def take_screenshot(self):
+        options = webdriver.ChromeOptions()
+        options.add_argument("--headless")
+        driver = webdriver.Chrome(options=options)
+        driver.get(self.url)
+        driver.save_screenshot(self.output_path)
+        driver.quit()
 
-PATHS = ['/mnt/data/amir/GWANN-TEST/GWANN/metrics/1M-DATA-SET/64_0.01_50',
-         '/mnt/data/amir/GWANN-TEST/GWANN/metrics/1M-DATA-SET/64_0.01_60',
-         '/mnt/data/amir/GWANN-TEST/GWANN/metrics/1M-DATA-SET/64_0.01_70',
-         '/mnt/data/amir/GWANN-TEST/GWANN/metrics/1M-DATA-SET/64_0.01_130',
-         "/mnt/data/amir/GWANN-TEST/GWANN/metrics/1M-DATA-SET/64_0.01_120",
-         '/mnt/data/amir/GWANN-TEST/GWANN/metrics/1M-DATA-SET/64_0.01_140',
-         '/mnt/data/amir/GWANN-TEST/GWANN/metrics/1M-DATA-SET/64_0.01_160',
-         '/mnt/data/amir/GWANN-TEST/GWANN/metrics/1M-DATA-SET/64_0.01_190',
-         ]
 
 
-def get_images(path):
-    images = os.listdir(path)
-    return [os.path.join(path, img) for img in images if img.endswith('.png')]
+
+class Filter:
+    def __init__(self, baseDirPath):
+        self.path = baseDirPath
+
+    def filter(self, condition):
+        return [
+            os.path.join(self.path, f)
+            for f in os.listdir(self.path)
+            if condition(f)
+        ]
+    
+    def _safe_float(self, value):
+        try:
+            return float(value)
+        except ValueError:
+            return float('inf')
+        
+    def filter_by_parts(self, first=None, middle=None, last=None):
+        filtered = self.filter(lambda name: self._matches_parts(name, first, middle, last))
+        return sorted(filtered, key=lambda p: self._safe_float(os.path.basename(p).split("_")[-1]))
+
+    def _matches_parts(self, name, first, middle, last):
+        parts = name.split("_")
+        if len(parts) != 3:
+            return False
+        return (
+            (first is None or parts[0] == str(first)) and
+            (middle is None or parts[1] == str(middle)) and
+            (last is None or parts[2] == str(last))
+        )
 
 
-def build_figure(MATRIX):
-    fig, ax = plt.subplots(len(MATRIX), 5, figsize=(20, 20))
 
-    for i, path in enumerate(MATRIX):
-        images = get_images(path)
-        for j, img_path in enumerate(images):
-            img = Image.open(img_path)
-            ax[i, j].imshow(np.array(img))
-            ax[i, j].axis('off')
-            ax[i, j].set_title(os.path.basename(img_path))
-    plt.tight_layout()
-    plt.savefig('output_figure.png', dpi=300)
+class FigureBuilder:
+    def __init__(self, paths, output_dir='output'):
+        self.paths = paths
+        self.output_dir = output_dir
 
-build_figure(PATHS)
+    def build_figures(self):
+        fig, ax = plt.subplots(len(self.paths), 5, figsize=(20, 20))
+
+        for i, path in enumerate(self.paths):
+            self._create_image_from_html(path)
+            images = self.get_images(path)
+            for j, img_path in enumerate(images):
+                img = Image.open(img_path)
+                ax[i, j].imshow(np.array(img))
+                ax[i, j].axis('off')
+                ax[i, j].set_title(os.path.basename(img_path))
+        plt.tight_layout()
+        plt.savefig(self.output_dir, dpi=300)
+
+    def _create_image_from_html(self, path):
+        images = os.listdir(path)
+        html_file = [os.path.join(path, img) for img in images if img.endswith('.html')][0]
+        parts = os.path.basename(path).split("_")
+        formatted_name = f"Batch={parts[0]}_LR={parts[1]}_SR={parts[2]}.png"
+        if formatted_name not in images:
+            Screenshot(html_file, os.path.join(path, formatted_name)).take_screenshot()
+
+    def get_images(self, path):
+        images = os.listdir(path)
+        return [os.path.join(path, img) for img in images if img.endswith('.png')]
+
+
+
+if __name__ == "__main__":
+    parser = argparse.ArgumentParser(description="Build figure from filtered experiment results.")
+    parser.add_argument("--f", type=str, default=None, help="First part of directory name (e.g., batch size).")
+    parser.add_argument("--m", type=str, default=None, help="Middle part of directory name (e.g., learning rate).")
+    parser.add_argument("--l", type=str, default=None, help="Last part of directory name (e.g., sample rate).")
+    parser.add_argument("--b", type=str, required=True, help="Base directory path containing results.")
+    args = parser.parse_args()
+
+
+    f = Filter(args.b)
+    FigureBuilder(f.filter_by_parts(first=args.f, middle=args.m, last=args.l), 
+                  f'Batch={args.f},LR={args.m},SR={args.l if args.l else "all"}.png').build_figures()

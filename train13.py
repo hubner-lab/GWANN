@@ -15,9 +15,9 @@ from sklearn.metrics import matthews_corrcoef
 import random
 import tensorflow as tf
 
-random.seed(42)
-np.random.seed(42)
-tf.random.set_seed(42)
+# random.seed(42)
+# np.random.seed(42)
+# tf.random.set_seed(42)
 class Train:
     def __init__(self, model_name:str, total_simulations:int,
                 sampledSitesIncludeCausals: int, columns:int,
@@ -34,23 +34,70 @@ class Train:
         self.test_ratio = test_ratio
         self.logger = Logger(f'Message:', f"{os.environ['LOGGER']}")
     
-
+    def shuffle_data(self, X, y):
+        idx = np.arange(len(X))
+        np.random.shuffle(idx)
+        return X[idx], y[idx]
+    
     def data_splitter(self):
-        # First split into train and temp (which will be split into val and test)
-        X_train, X_temp, y_train, y_temp = train_test_split(
-            self.dataset.X.numpy(),
-            self.dataset.y.numpy(),
-            test_size=self.test_ratio, 
-            random_state=42
-        )
+        tp_indices = np.where(self.dataset.y.numpy() == 1)
+        tn_indices = np.where(self.dataset.y.numpy() == 0)
+        self.logger.debug(f"Total samples: {len(self.dataset.y)}")
 
-        val_ratio = 0.5  
-        X_val, X_test, y_val, y_test = train_test_split(
-            X_temp,
-            y_temp,
-            test_size=val_ratio,
-            random_state=42
+        tp_images = self.dataset.X.numpy()[tp_indices]
+        tn_images = self.dataset.X.numpy()[tn_indices]
+        self.logger.debug(f"Number of True Positive samples: {len(tp_images)}")
+        self.logger.debug(f"Number of True Negative samples: {len(tn_images)}")
+
+        cut_train_tp = int((1 - self.test_ratio) * len(tp_images))
+        cut_train_tn = int((1 - self.test_ratio) * len(tn_images))
+        self.logger.debug(f"Cut points for training: {cut_train_tp} TP, {cut_train_tn} TN")
+
+        # Training sets
+        X_train_tp = tp_images[:cut_train_tp]
+        X_train_tn = tn_images[:cut_train_tn]
+        Y_train_tp = np.ones(len(X_train_tp), dtype=int)
+        Y_train_tn = np.zeros(len(X_train_tn), dtype=int)
+        self.logger.debug(f"Training set before shuffle: {len(X_train_tp)} TP, {len(X_train_tn)} TN")
+
+        # Remaining data for validation + test
+        X_rest_tp = tp_images[cut_train_tp:]
+        X_rest_tn = tn_images[cut_train_tn:]
+        self.logger.debug(f"Remaining for val/test: {len(X_rest_tp)} TP, {len(X_rest_tn)} TN")
+
+        validation_ratio = 0.2
+        cut_val_tp = int(validation_ratio * len(X_rest_tp))
+        cut_val_tn = int(validation_ratio * len(X_rest_tn))
+        self.logger.debug(f"Cut points for validation: {cut_val_tp} TP, {cut_val_tn} TN")
+
+        # Validation sets
+        X_val_tp = X_rest_tp[:cut_val_tp]
+        X_val_tn = X_rest_tn[:cut_val_tn]
+        self.logger.debug(f"Validation set before shuffle: {len(X_val_tp)} TP, {len(X_val_tn)} TN")
+
+        # Test sets
+        X_test_tp = X_rest_tp[cut_val_tp:]
+        X_test_tn = X_rest_tn[cut_val_tn:]
+        self.logger.debug(f"Test set before shuffle: {len(X_test_tp)} TP, {len(X_test_tn)} TN")
+
+        # Merge and shuffle
+        X_train, y_train = self.shuffle_data(
+            np.concatenate((X_train_tp, X_train_tn), axis=0),
+            np.concatenate((Y_train_tp, Y_train_tn), axis=0)
         )
+        self.logger.debug(f"Training set after shuffle: {len(X_train)} samples")
+
+        X_val, y_val = self.shuffle_data(
+            np.concatenate((X_val_tp, X_val_tn), axis=0),
+            np.concatenate((np.ones(len(X_val_tp), dtype=int), np.zeros(len(X_val_tn), dtype=int)), axis=0)
+        )
+        self.logger.debug(f"Validation set after shuffle: {len(X_val)} samples")
+
+        X_test, y_test = self.shuffle_data(
+            np.concatenate((X_test_tp, X_test_tn), axis=0),
+            np.concatenate((np.ones(len(X_test_tp), dtype=int), np.zeros(len(X_test_tn), dtype=int)), axis=0)
+        )
+        self.logger.debug(f"Test set after shuffle: {len(X_test)} samples")
 
         return X_train, X_val, X_test, y_train, y_val, y_test
 
