@@ -60,7 +60,7 @@ class FigureBuilder:
         self.output_dir = output_dir
 
     def build_figures(self):
-        fig, ax = plt.subplots(len(self.paths), 5, figsize=(20, 20))
+        fig, ax = plt.subplots(len(self.paths), 6, figsize=(20, 20))
 
         for i, path in enumerate(self.paths):
             self._create_image_from_html(path)
@@ -89,13 +89,13 @@ class FigureBuilder:
 
 if __name__ == "__main__":
     parser = argparse.ArgumentParser(description="Build figure from filtered experiment results.")
-    parser.add_argument("--f", type=str, default=None, help="First part of directory name (e.g., batch size).")
-    parser.add_argument("--m", type=str, default=None, help="Middle part of directory name (e.g., learning rate).")
-    parser.add_argument("--l", type=str, default=None, help="Last part of directory name (e.g., sample rate).")
-    parser.add_argument("--b", type=str, required=True, help="Base directory path containing results.")
+    parser.add_argument("--b", type=str, default=None, help="First part of directory name (e.g., batch size).")
+    parser.add_argument("--lr", type=str, default=None, help="Middle part of directory name (e.g., learning rate).")
+    parser.add_argument("--sr", type=str, default=None, help="Last part of directory name (e.g., sample rate).")
+    parser.add_argument("--p", type=str, required=True, help="Base directory path containing results.")
     args = parser.parse_args()
 
 
-    f = Filter(args.b)
-    FigureBuilder(f.filter_by_parts(first=args.f, middle=args.m, last=args.l), 
-                  f'Batch={args.f},LR={args.m},SR={args.l if args.l else "all"}.png').build_figures()
+    f = Filter(args.p)
+    FigureBuilder(f.filter_by_parts(first=args.b, middle=args.lr, last=args.sr), 
+                  f'Batch={args.b if args.b else "all"},LR={args.lr if args.lr else "all"},SR={args.sr if args.sr else "all"}.png').build_figures()

@@ -12,12 +12,27 @@ from tensorflow.keras.optimizers import SGD, Adam
 from sklearn.metrics import precision_score, recall_score, f1_score, average_precision_score
 from TrainingVisualizer import TrainingVisualizer
 from sklearn.metrics import matthews_corrcoef
-import random
-import tensorflow as tf
-
+from tensorflow.keras import backend as K
 # random.seed(42)
 # np.random.seed(42)
 # tf.random.set_seed(42)
+
+
+
+
+
+def f1_m(y_true, y_pred):
+    y_pred = K.round(y_pred)
+    tp = K.sum(K.cast(y_true * y_pred, 'float'), axis=0)
+    fp = K.sum(K.cast((1-y_true) * y_pred, 'float'), axis=0)
+    fn = K.sum(K.cast(y_true * (1-y_pred), 'float'), axis=0)
+
+    p = tp / (tp + fp + K.epsilon())
+    r = tp / (tp + fn + K.epsilon())
+
+    f1 = 2*p*r / (p+r+K.epsilon())
+    return K.mean(f1)
+
 class Train:
     def __init__(self, model_name:str, total_simulations:int,
                 sampledSitesIncludeCausals: int, columns:int,
@@ -131,7 +146,6 @@ class Train:
         X_test = np.expand_dims(X_test, -1)
         X_val = np.expand_dims(X_val, -1)
 
-        self.logger.debug(f"Data split into {len(X_train)} training samples and {len(X_test)} testing samples.")
         self.logger.info("Data split successfully.")
 
         self.height, self.width = self.dataset.X.shape[1:3]
@@ -141,7 +155,7 @@ class Train:
         model = modelBuilder.model_summary()
 
         self.logger.info(f'Setting model learning rate to: {self.learning_rate}')
-        model.compile(optimizer=Adam(learning_rate=self.learning_rate), loss='categorical_crossentropy', metrics=['accuracy'])
+        model.compile(optimizer=Adam(learning_rate=self.learning_rate), loss='categorical_crossentropy', metrics=['accuracy', f1_m])
 
      
         self.logger.info("Training model...")
@@ -185,10 +199,10 @@ class Train:
         model.save(f"{MODEL_PATH_TENSOR_DIR}/{self.model_name}.h5")
 
 
-        test_loss, test_acc = model.evaluate(X_test, y_test)
+        test_loss, test_acc, test_f1  = model.evaluate(X_test, y_test)
         self.logger.info(f'Test loss: {test_loss}')
         self.logger.info(f'Test accuracy: {test_acc}')
-
+        self.logger.info(f'Test F1-score: {test_f1}')   
   
         y_pred_probs = model.predict(X_test)
         y_pred_labels = np.argmax(y_pred_probs, axis=1)
@@ -212,6 +226,7 @@ class Train:
         visualizer.plot_confusion_matrix(y_test_labels, y_pred_labels)
         visualizer.plot_precision_recall(y_test[:, 1], y_pred_probs[:, 1]) 
         visualizer.plot_roc_curve(y_test[:, 1], y_pred_probs[:, 1])
+        visualizer.plot_f1_score(history)
         visualizer.plot_full_history(history)
 
 

@@ -85,6 +85,23 @@ class TrainingVisualizer:
         plt.savefig(f"{self.save_dir}/learning_rate.png")
         plt.close()
     
+    def plot_f1_score(self, history):
+        if 'f1_m' not in history.history and 'val_f1_m' not in history.history:
+            print("F1 score not found in training history.")
+            return
+
+        plt.figure()
+        plt.plot(history.history.get('f1_m', []), label='Train F1')
+        plt.plot(history.history.get('val_f1_m', []), label='Val F1')
+        plt.title('F1 Score Over Epochs')
+        plt.xlabel('Epoch')
+        plt.ylabel('F1 Score')
+        plt.grid(True)
+        plt.legend()
+        plt.savefig(f"{self.save_dir}/f1_score.png")
+        plt.close()
+
+
     def plot_full_history(self, history):
         has_lr = 'lr' in history.history
         n_subplots = 3 if has_lr else 2

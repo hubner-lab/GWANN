@@ -105,7 +105,7 @@ class Run:
         X_input = np.expand_dims(createImages(self.width,  sorted_vcf, self.sim_indivduals), axis=-1)  # Add channel dim (height, width, 1)
 
         Logger(f'Message:', os.environ['LOGGER']).info(f"Loading trained TensorFlow model: {self.model_path}...")
-        model = load_model(self.model_path)
+        model = load_model(self.model_path, compile=False)
 
 
         Logger(f'Message:', os.environ['LOGGER']).info(f"Running inference on the model...")
