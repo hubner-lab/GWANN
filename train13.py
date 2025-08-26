@@ -13,11 +13,7 @@ from sklearn.metrics import precision_score, recall_score, f1_score, average_pre
 from TrainingVisualizer import TrainingVisualizer
 from sklearn.metrics import matthews_corrcoef
 from tensorflow.keras import backend as K
-# random.seed(42)
-# np.random.seed(42)
-# tf.random.set_seed(42)
-
-
+from snapshot import SnapShot
 
 
 
@@ -125,6 +121,10 @@ class Train:
         self.logger.info("Splitting data into training and testing sets...")
 
         X_train, X_val, X_test, y_train, y_val, y_test = self.data_splitter()
+        
+        SnapShot(X_train, y_train, "./snap/train").save_snapshot(f"train_tp")
+        SnapShot(X_val, y_val, "./snap/train").save_snapshot(f"val_tp")    
+        SnapShot(X_test, y_test, "./snap/train").save_snapshot(f"test_tp")
 
         self.logger.debug(f"y_train True labels: {len(y_train[y_train == 1]) }")
         self.logger.debug(f"y_train False labels: {len(y_train[y_train == 0]) }")

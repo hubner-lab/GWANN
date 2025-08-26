@@ -1,1 +1,1 @@
-{"samples": 529, "width": 23, "simulations": 100, "model_name": "./models/model2.h5", "current_command": "run", "total_snps": 10000}
+{"samples": 529, "width": 23, "simulations": 15, "model_name": "./models/model2.h5", "current_command": "run", "total_snps": 10000}

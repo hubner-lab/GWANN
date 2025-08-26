@@ -8,8 +8,11 @@ import os
 from concurrent.futures import ProcessPoolExecutor, as_completed, TimeoutError
 from tqdm import tqdm
 from utilities import json_update
+from snapshot import SnapShot
 import multiprocessing
 multiprocessing.set_start_method('spawn', force=True)
+import numpy as np
+
 
 def loader_helper(simPath: str, sampledSitesIncludeCausals: int, columns: int, simIndex: int, mds:bool):
     """
@@ -42,7 +45,7 @@ def loader_helper(simPath: str, sampledSitesIncludeCausals: int, columns: int, s
 
         X_local.append(img)
         y_local.append(int(simData['labels'][idx]))
-
+    SnapShot(np.array(X_local),np.array(y_local), "./snap/simloader").save_snapshot(f"sim_{simIndex}_tp")
     return X_local, y_local
 
 
@@ -138,7 +141,7 @@ class Dataset:
         self.logger.debug(f"Total false labels: {total_non_causal_mds_include}")
         self.logger.debug(f"Sampling rate: { int(total_causal / total_causal)}:{int(total_non_causal_mds_include/total_causal)}")
 
-
+        SnapShot(self.X.numpy(), self.y.numpy(), "./snap/dataSet").save_snapshot(f"data_set_tp")
 
 
 if __name__ == '__main__':
