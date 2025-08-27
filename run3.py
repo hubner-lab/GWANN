@@ -10,7 +10,7 @@ import numpy as np
 import plotly.graph_objects as go
 import allel
 import re
-from scipy.ndimage import laplace
+from snapshot import SnapShot
 
 
 def tanh_map(output, scale=10):
@@ -111,7 +111,8 @@ class Run:
         Logger(f'Message:', os.environ['LOGGER']).info(f"Running inference on the model...")
         predictions = model.predict(X_input, batch_size=4096)  # batch_size to make the prediction process run faster, multi process created 
 
-        output =  predictions[:, 1]
+        output =  predictions[:, 1] # get the 1 class probability
+        SnapShot(X_input,np.round(output), "/mnt/data/amir/GWANN-TEST/GWANN/snap/run_result").save_prediction(f"predicted_as_tp")
         df = pd.DataFrame({"value": output}, index=range(len(output)))
         df.to_csv(f"{self.output_path}.csv")
         self.logger.info(f"Output saved to {self.output_path}.csv")

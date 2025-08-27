@@ -32,10 +32,10 @@ def compare_across_dirs(ref_dir, other_dirs):
         for ref_name, ref_arr in ref_arrays:
             match = compare_arrays(ref_arr, other_arrays)
             if match:
-                print(f"{i}:✅ {ref_name} exists in {d} (matched {match}).")
+                print(f"{i}:{ref_name} exists in {d} (matched {match}).")
                 i+=1
             else:
-                print(f"❌ {ref_name} not found in {d}.")
+                print(f"{ref_name} not found in {d}.")
 
 if __name__ == "__main__":
     ref_dir = "/mnt/data/amir/GWANN-TEST/GWANN/snap/dataSet"  # reference dir
