@@ -112,7 +112,8 @@ class Run:
         predictions = model.predict(X_input, batch_size=4096)  # batch_size to make the prediction process run faster, multi process created 
 
         output =  predictions[:, 1] # get the 1 class probability
-        SnapShot(X_input,np.round(output), "/mnt/data/amir/GWANN-TEST/GWANN/snap/run_result").save_prediction(f"predicted_as_tp")
+        SnapShot(X_input,np.round(output), "/mnt/data/amir/GWANN-TEST/GWANN/snap/run_result").save_prediction_tp(f"predicted_as_tp")
+        SnapShot(X_input,np.round(output), "/mnt/data/amir/GWANN-TEST/GWANN/snap2/run_result").save_prediction_fp(f"predicted_as_fp")
         df = pd.DataFrame({"value": output}, index=range(len(output)))
         df.to_csv(f"{self.output_path}.csv")
         self.logger.info(f"Output saved to {self.output_path}.csv")

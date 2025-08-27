@@ -4,7 +4,7 @@ from sklearn.manifold import MDS
 from utilities import json_get, createImages
 from const import TOTAL_SNPS 
 from scipy.ndimage import laplace
-from snapshot import SnapShot
+
 
 class SimulationDataReader:
     ALLELE_MAPPING = {'A': 1, 'T': 0, '0': -1}

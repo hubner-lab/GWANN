@@ -45,7 +45,8 @@ def loader_helper(simPath: str, sampledSitesIncludeCausals: int, columns: int, s
 
         X_local.append(img)
         y_local.append(int(simData['labels'][idx]))
-    SnapShot(np.array(X_local),np.array(y_local), "./snap/simloader").save_snapshot(f"sim_{simIndex}_tp")
+    SnapShot(np.array(X_local),np.array(y_local), "./snap/simloader").save_snapshot_tp(f"sim_{simIndex}_tp")
+    SnapShot(np.array(X_local),np.array(y_local), "./snap2/simloader").save_snapshot_fp(f"sim_{simIndex}_fp")
     return X_local, y_local
 
 
@@ -141,8 +142,8 @@ class Dataset:
         self.logger.debug(f"Total false labels: {total_non_causal_mds_include}")
         self.logger.debug(f"Sampling rate: { int(total_causal / total_causal)}:{int(total_non_causal_mds_include/total_causal)}")
 
-        SnapShot(self.X.numpy(), self.y.numpy(), "./snap/dataSet").save_snapshot(f"data_set_tp")
-
+        SnapShot(self.X.numpy(), self.y.numpy(), "./snap/dataSet").save_snapshot_tp(f"data_set_tp")
+        SnapShot(self.X.numpy(), self.y.numpy(), "./snap2/dataSet").save_snapshot_fp(f"data_set_fp")
 
 if __name__ == '__main__':
     # Example usage
