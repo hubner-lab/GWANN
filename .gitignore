@@ -42,3 +42,5 @@ results/*
 vcf_data
 logs/*
 metrics
+snap/
+snap2/

@@ -11,7 +11,7 @@ class GenomeImage:
         return data.reshape(self.rows, self.colums)
     
     def plot_sample(self, dir_name,sample, image_name):
-        plt.imshow(sample) 
+        plt.imshow(sample, cmap='gray') 
         plt.title(image_name) 
         if not os.path.isdir(dir_name):
             os.mkdir(dir_name)
