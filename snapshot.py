@@ -5,10 +5,11 @@ import os
 from PIL import Image
 from genomeToImage import GenomeImage
 class SnapShot:
-    def __init__(self, X, labels, save_dir):
+    def __init__(self, X, labels, save_dir, creat_numpy=False):
         self.X = X
         self.labels = labels
         self.save_dir = save_dir
+        self.createt_numpy = creat_numpy
         self.genome_image = GenomeImage(1,1)  # Dummy initialization
     
     def _get_samples(self, label=1):
@@ -27,8 +28,9 @@ class SnapShot:
         """
         os.makedirs(self.save_dir, exist_ok=True)
         for i, sample in enumerate(self._get_samples()):
-            file_path = os.path.join(self.save_dir, f"{filename}_sample_{i}.npy")
-            np.save(file_path, sample)
+            if self.createt_numpy:
+                file_path = os.path.join(self.save_dir, f"{filename}_sample_{i}.npy")
+                np.save(file_path, sample)
             self.genome_image.plot_sample(self.save_dir,sample, f"{filename}_sample_{i}")
     
     def save_prediction_tp(self, filename: str) -> None:
@@ -48,8 +50,9 @@ class SnapShot:
             tp_samples = tp_samples[indices]
 
         for i, sample in enumerate(tp_samples):
-            file_path = os.path.join(self.save_dir, f"{filename}_sample_{i}.npy")
-            np.save(file_path, sample)
+            if self.createt_numpy:
+                file_path = os.path.join(self.save_dir, f"{filename}_sample_{i}.npy")
+                np.save(file_path, sample)
             self.genome_image.plot_sample(self.save_dir, sample[:, :, :, 0], f"{filename}_sample_{i}")
 
     
@@ -61,17 +64,18 @@ class SnapShot:
         filename (str): The name of the file to save the snapshot to.
         """
         os.makedirs(self.save_dir, exist_ok=True)
-        SAMPLES = 100
+        SAMPLES = 10
 
         tp_samples = self._get_samples(label=0)
-        # If more than 100, randomly choose 100 without replacement
+        # If more than 10, randomly choose 10 without replacement
         if len(tp_samples) > SAMPLES:
             indices = np.random.choice(len(tp_samples), SAMPLES, replace=False)
             tp_samples = tp_samples[indices]
 
         for i, sample in enumerate(tp_samples):
-            file_path = os.path.join(self.save_dir, f"{filename}_sample_{i}.npy")
-            np.save(file_path, sample)
+            if self.createt_numpy:
+                file_path = os.path.join(self.save_dir, f"{filename}_sample_{i}.npy")
+                np.save(file_path, sample)
             self.genome_image.plot_sample(self.save_dir,sample, f"{filename}_sample_{i}")
     
 
@@ -92,6 +96,7 @@ class SnapShot:
             tp_samples = tp_samples[indices]
 
         for i, sample in enumerate(tp_samples):
-            file_path = os.path.join(self.save_dir, f"{filename}_sample_{i}.npy")
-            np.save(file_path, sample)
+            if self.createt_numpy:
+                file_path = os.path.join(self.save_dir, f"{filename}_sample_{i}.npy")
+                np.save(file_path, sample)
             self.genome_image.plot_sample(self.save_dir, sample[:, :, :, 0], f"{filename}_sample_{i}")

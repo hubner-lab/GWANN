@@ -1,13 +1,14 @@
 import pandas as pd
 import numpy as np 
 from sklearn.manifold import MDS
-from utilities import json_get, createImages
+from utilities import json_get
 from const import TOTAL_SNPS 
-from scipy.ndimage import laplace
+
 
 
 class SimulationDataReader:
     ALLELE_MAPPING = {'A': 1, 'T': 0, '0': -1}
+    GENMODEL={"minor" : 0, "major" : 2, "heterozygote" : 1, "missing" : -1}
     PED_COLUMNS = ['Family_ID', 'Individual_ID', 'Paternal_ID', 'Maternal_ID', 'Sex', 'Phenotype']
     SUFFIX_GENO_PED = '0.ped'
     SUFFIX_CAUSAL = '0.causal'
@@ -98,6 +99,8 @@ class SimulationDataReader:
         matrix2 = mapped_matrix[:, 1::2]
 
         self.geno_data_np = matrix1 + matrix2
+
+        self.geno_data_np[self.geno_data_np == 1] = self.GENMODEL[json_get("gene_model")]
         self.geno_data_np[self.geno_data_np == -2] = -1 
         self.geno_data_np = (self.geno_data_np.T + 1) * 1/3
 
@@ -212,4 +215,4 @@ class SimulationDataReader:
 
 if __name__ == "__main__":
     data_reader = SimulationDataReader('./simulation/data/', True)
-    data_reader.run(1, 20)
+    data_reader.run(0, 20)

@@ -122,14 +122,14 @@ class Train:
 
         X_train, X_val, X_test, y_train, y_val, y_test = self.data_splitter()
         
-        SnapShot(X_train, y_train, "./snap/train").save_snapshot_tp(f"train_tp")
-        SnapShot(X_val, y_val, "./snap/train").save_snapshot_tp(f"val_tp")    
-        SnapShot(X_test, y_test, "./snap/train").save_snapshot_tp(f"test_tp")
+        # SnapShot(X_train, y_train, "./causal/train").save_snapshot_tp(f"train_tp")
+        # SnapShot(X_val, y_val, "./causal/train").save_snapshot_tp(f"val_tp")    
+        # SnapShot(X_test, y_test, "./causal/train").save_snapshot_tp(f"test_tp")
 
 
-        SnapShot(X_train, y_train, "./snap2/train").save_snapshot_fp(f"train_fp")
-        SnapShot(X_val, y_val, "./snap2/train").save_snapshot_fp(f"val_fp")    
-        SnapShot(X_test, y_test, "./snap2/train").save_snapshot_fp(f"test_fp")
+        # SnapShot(X_train, y_train, "./causal_None/train").save_snapshot_fp(f"train_fp")
+        # SnapShot(X_val, y_val, "./causal_None/train").save_snapshot_fp(f"val_fp")    
+        # SnapShot(X_test, y_test, "./causal_None/train").save_snapshot_fp(f"test_fp")
         
 
         self.logger.debug(f"y_train True labels: {len(y_train[y_train == 1]) }")

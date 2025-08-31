@@ -1,1 +1,1 @@
-{"samples": 529, "width": 23, "simulations": 100, "model_name": "./models/model1.h5", "current_command": "run", "total_snps": 10000}
+{"samples": 529, "width": 23, "simulations": 100, "model_name": "./models/model1.h5", "current_command": "run", "total_snps": 10000, "gene_model": "heterozygote"}

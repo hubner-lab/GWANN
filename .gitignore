@@ -1,10 +1,6 @@
-# Ignore Python cache files
 __pycache__/
-# Ignore args directory
 args/
-# Ignore config directories
 config*/
-# Ignore specific directories
 ../GWANN_2/vcf_data/
 vcf_data/
 *.sh
@@ -42,5 +38,5 @@ results/*
 vcf_data
 logs/*
 metrics
-snap/
-snap2/
+causal/
+causal_None/

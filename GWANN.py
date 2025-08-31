@@ -151,6 +151,7 @@ class CLIManager:
     @click.option('-w', '--width', 'width', default=15, type=int, help="Image width must be a divisor of the number of individuals")
     @click.option('--path', 'sim_path', required=True, type=str, help="Path to the simulated data")
     @click.option('--mds', 'mds', default=False,is_flag=True, type=bool, help="Apply mds transformation on the phenotype matrix, add TN to avoid population structure")
+    @click.option('--geneModel', '--GM', 'gm', default="heterozygote", type=str, help="Choose one of the four models:minor (0), major(2), missing (-1), and heterozygote (1)")  
     def train(
         model_name: str,
         epochs: int, 
@@ -160,7 +161,8 @@ class CLIManager:
         width: int,
         lr: float,
         sim_path: str,
-        mds,
+        mds: bool,
+        gm: str
     ) -> None:
         """Train the model for GWANN analysis.
 
@@ -182,12 +184,13 @@ class CLIManager:
         Returns:
             None: This function does not return any value.
         """
+        json_update("gene_model", gm)
         start_time = time.time()
         LOGGER_FILE = "train"
         os.environ['LOGGER'] = f'{LOGGER_DIR}/{LOGGER_FILE}_{datetime.datetime.now().strftime("%Y-%m-%d_%H-%M-%S")}.log'
         Logger(
             f'Message:',
-            f"{os.environ['LOGGER']}").debug(f"Training with {epochs} epochs, {n_snps} sampled-SNPs, batch-size: {batch}, ratio: {ratio}, width: {width}, path: {sim_path}, model-name: {model_name}, mds: {mds}, lr: {lr}")
+            f"{os.environ['LOGGER']}").debug(f"Training with {epochs} epochs, {n_snps} sampled-SNPs, batch-size: {batch}, ratio: {ratio}, width: {width}, path: {sim_path}, model-name: {model_name}, mds: {mds}, lr: {lr}, gene-model: {gm}")
         total_simulations = json_get(SIMULATIONS)
         Train(model_name, total_simulations, n_snps, width, batch,lr ,epochs,mds, sim_path, ratio).run()
         log_resource_usage(start_time,Logger(f'Message:', f"{os.environ['LOGGER']}"), "Train")

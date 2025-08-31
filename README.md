@@ -131,6 +131,9 @@ Options:
   --mds                 Apply mds transformation on the phenotype matrix, add
                         TN to avoid population structure
   --help                Show this message and exit.
+  --geneModel, --GM TEXT     Choose one of the four models, where a value of
+                             2/3 is interpreted as follows: recessive = 0,
+                             dominant = 1, additive = 0.2/3, noHet = 0
 ```
 
 ```bash
