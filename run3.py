@@ -70,7 +70,7 @@ class Run:
             raise ValueError('Sample field missing in phenotype file')
         if self.trait not in pheno.keys():
             raise ValueError('Trait field missing in phenotype file')
-        return callset['calldata/GT'], callset['samples'], callset['variants/CHROM'], pheno 
+        return callset['variants/POS'],callset['calldata/GT'], callset['samples'], callset['variants/CHROM'], pheno 
 
     def calc_avg_vcf(self, vcf_data):
 
@@ -147,7 +147,7 @@ class Run:
         sorted_labels = [label for _, label in sorted(zip(sort_keys, chrom_arr))]       
         return sorted_labels
     
-    def plot_data(self, chrom, output):
+    def plot_data(self,positions, chrom, output):
     
         chrom_labels = self.filter_chrom(chrom)
 
@@ -160,8 +160,13 @@ class Run:
 
         for i, chr_label in enumerate(chrom_labels):
             chr_indices = np.where(chrom == chr_label)[0]
+            positions_chr = positions[chr_indices]
+            post_sorted_args = np.argsort(positions_chr)
+            chr_indices = chr_indices[post_sorted_args]
             chr_outputs = output[chr_indices]
-
+        
+    
+            
             x_chr = np.arange(current_position, current_position + len(chr_indices))
 
             # Alternate color: even index = blue, odd index = black
@@ -184,17 +189,17 @@ class Run:
         fig.update_layout(
             title="Prediction of SNPs associated with the trait.",
             xaxis=dict(tickmode='array', tickvals=x_ticks, ticktext=x_tick_labels, title="Chromosome"),
-            yaxis=dict(title="Prediction(%)", range=[0, 100]),
+            yaxis=dict(title="Prediction(%)", range=[self.th, 100]),
             showlegend=True,
             shapes=[
                 dict(
                     type='line',
                     x0=0,
                     x1=current_position,  # spans the full x-axis range aligned with chromosomes
-                    y0=self.th,
-                    y1=self.th,
+                    y0=50,
+                    y1=50,
                     line=dict(color='green', width=2, dash='dash'),
-                    name=f"{self.th} Threshold Line"
+                    name="50% Threshold Line"
                 )
             ],
             updatemenus=[
@@ -227,7 +232,7 @@ class Run:
         """Run on real data using a trained TensorFlow model"""
 
 
-        vcf_data, vcf_samples, chrom, pheno = self.load_and_parse_data()
+        positions, vcf_data, vcf_samples, chrom, pheno = self.load_and_parse_data()
 
         tmp_vcf = self.calc_avg_vcf(vcf_data)
 
@@ -245,7 +250,7 @@ class Run:
         causal_snps = len(np.where(output/100 >self.th/100.0)[0])
         percentage = causal_snps/len(output)
         print(f'Causal SNPs(%):{100*percentage}')
-        self.plot_data(chrom, output)
+        self.plot_data(positions,chrom, output)
 
 
 
