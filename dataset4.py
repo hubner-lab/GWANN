@@ -1,17 +1,16 @@
-from simulationloader3 import SimulationDataReader # with mds Sariel description (Add None-causal as TN) optimized 
-# from simulationloader2 import SimulationDataReader # with mds Sariel description (Add None-causal as TN)
-# from simulationloader import SimulationDataReader  # no mds 
+from simulationloader3 import SimulationDataReader 
 from genomeToImage import GenomeImage
 import tensorflow as tf
 from mylogger import Logger
 import os
 from concurrent.futures import ProcessPoolExecutor, as_completed, TimeoutError
 from tqdm import tqdm
-from utilities import json_update
+from utilities import json_update, json_get
 from snapshot import SnapShot
 import multiprocessing
 multiprocessing.set_start_method('spawn', force=True)
 import numpy as np
+from const import SNAP, WIDTH
 
 
 def loader_helper(simPath: str, sampledSitesIncludeCausals: int, columns: int, simIndex: int, mds:bool):
@@ -45,8 +44,11 @@ def loader_helper(simPath: str, sampledSitesIncludeCausals: int, columns: int, s
 
         X_local.append(img)
         y_local.append(int(simData['labels'][idx]))
-    SnapShot(np.array(X_local),np.array(y_local), "./causal/simloader").save_snapshot_tp(f"sim_{simIndex}_tp")
-    SnapShot(np.array(X_local),np.array(y_local), "./causal_None/simloader").save_snapshot_fp(f"sim_{simIndex}_fp")
+
+    if json_get(SNAP):
+        SnapShot(np.array(X_local),np.array(y_local), "./causal/simloader").save_snapshot_tp(f"sim_{simIndex}_tp")
+        SnapShot(np.array(X_local),np.array(y_local), "./causal_None/simloader").save_snapshot_fp(f"sim_{simIndex}_fp")
+    
     return X_local, y_local
 
 
@@ -70,7 +72,7 @@ class Dataset:
         self.timeout = timeout
         self.mds = mds
 
-        json_update("width", self.columns)
+        json_update(WIDTH, self.columns)
         self.X: tf.Tensor = None
         self.y: tf.Tensor = None
 
@@ -87,10 +89,8 @@ class Dataset:
         )
 
         X_all, y_all = [], []
-        # loader_helper(self.simPath, self.sampledSitesIncludeCausals, self.columns, 0) # for debug
         self.logger.debug(f"Running simulation with mds={self.mds}")
         with ProcessPoolExecutor(max_workers=cpus) as executor:
-            # submit all sims
             futures = {
                 executor.submit(
                     loader_helper,
@@ -124,13 +124,13 @@ class Dataset:
 
                 if result:
                     x_part, y_part = result
-                    # self.logger.info(f"[sim {sim_idx}] loaded {len(x_part)} samples.")
                     X_all.extend(x_part)
                     y_all.extend(y_part)
 
-        Logger('Message:', os.environ['LOGGER']).info(
+        self.logger.info(
             "All simulations loaded; converting lists to tensors."
         )
+
         self.X = tf.convert_to_tensor(X_all, dtype=tf.float32)
         self.y = tf.convert_to_tensor(y_all, dtype=tf.int32)
         self.logger.info("Tensors ready.")
@@ -142,8 +142,6 @@ class Dataset:
         self.logger.debug(f"Total false labels: {total_non_causal_mds_include}")
         self.logger.debug(f"Sampling rate: { int(total_causal / total_causal)}:{int(total_non_causal_mds_include/total_causal)}")
 
-        # SnapShot(self.X.numpy(), self.y.numpy(), "./causal/dataSet").save_snapshot_tp(f"data_set_tp")
-        # SnapShot(self.X.numpy(), self.y.numpy(), "./causal_None/dataSet").save_snapshot_fp(f"data_set_fp")
 
 if __name__ == '__main__':
     # Example usage

@@ -5,7 +5,6 @@ from utilities import json_get
 from const import TOTAL_SNPS
 
 
-
 class SimulationDataReader:
     ALLELE_MAPPING = {'A': 1, 'T': 0, '0': -1}
     GENMODEL={"minor" : 0, "major" : 2, "heterozygote" : 1, "missing" : -1}
@@ -13,15 +12,9 @@ class SimulationDataReader:
     SUFFIX_GENO_PED = '0.ped'
     SUFFIX_CAUSAL = '0.causal'
     COLUMN = 1 
-    count_once = False
-    SNP_total = 0
     def __init__(self, base_path:str, mds_flag:bool):
-
         self.base_path = base_path
-        self.sorted_causal_indices = None
         self.geno_data_pd = None
-        self.causal_snp_data_pd = None
-        self.pheno_data_pd = None
         self.geno_data_np = None
         self.causal_snp_data_np = None
         self.pheno_data_np = None
@@ -35,25 +28,20 @@ class SimulationDataReader:
         self.mds_data = None
         self.mds_flag = mds_flag
 
+
     def run(self, index, total_samples):
         self.load(index, total_samples)
         self.sort_phenotype()
         self.reorder_geno_data_according_to_pheno_sorted_order()
-
         self.mds_data = self.apply_mds_transformation()
-
         if self.mds_flag:
             self.sort_mds()
-
             # Get non-causal SNPs in current matrix
             non_causal_snps_indices = np.where(self.labels == 0)[0]
-
             self.reorder_geno_data_according_to_MDS_sorted_order(non_causal_snps_indices)
-
             # Duplicate non-causal data to make TNs
             labels = np.concatenate((self.labels, np.zeros(len(non_causal_snps_indices), dtype=int)), axis=0)
             inputMat = np.concatenate((self.geno_data_reordered_pheno, self.geno_data_reordered_mds), axis=0)
-
             return {
                 'input': inputMat,
                 'labels': labels,
@@ -72,6 +60,7 @@ class SimulationDataReader:
             self.mds_data_sorted = self.mds_data[:, sorted_indices]
             self.mds_arg_sorted = sorted_indices
 
+
     def reorder_geno_data_according_to_MDS_sorted_order(self, non_causal_snps_indices):
         """Reorder the genotype Matrix columns according to the order of mds sorted indices order
             Consider only the passed snps indices
@@ -80,6 +69,7 @@ class SimulationDataReader:
         if self.mds_data is not None and self.mds_data.size > 0 :
             temp = self.geno_data_np[non_causal_snps_indices,:] # Take the specific snps  sub-Matrix 
             self.geno_data_reordered_mds  = temp[:, self.mds_arg_sorted] # reorder sub-Matrix columns according to the mds sorted indices 
+
 
     def process_ped_data(self, all_snps):
         alleles_columns = [f'allel{i}' for i in range(all_snps*2) ]
@@ -134,18 +124,16 @@ class SimulationDataReader:
         n_non_causal = total_samples - n_causal
         sampled_non_causal = np.random.choice(non_causal_indices, n_non_causal, replace=False)
         all_sampled_indices = np.concatenate([causal_indices, sampled_non_causal])
-
+        # randomly shuffle the combined indices
         np.random.shuffle(all_sampled_indices)
-        
+        # mix the order of the indices to avoid any bias
         self.geno_data_np = self.geno_data_np[all_sampled_indices, :]
 
         self.labels = np.zeros(total_samples, dtype=int)
-        
+        # label the causal SNPs as 1
         for mapped_index, origin_index in enumerate(all_sampled_indices):
             if origin_index in causal_indices :
                 self.labels[mapped_index] = 1
-        
-
 
 
     def sort_phenotype(self):
@@ -154,6 +142,7 @@ class SimulationDataReader:
             self.phone_arg_sorted = np.argsort(self.pheno_data_np).squeeze()
             # self.pheno_data_sorted = np.sort(self.pheno_data_np)
 
+
     def sort_causal_snps(self):
         "sort the causal snp file according to the indices"
         if self.causal_snp_data_np is not None and self.causal_snp_data_np.size > 0 :
@@ -161,10 +150,12 @@ class SimulationDataReader:
             sorted_causal_indices = np.argsort(self.causal_snp_data_np[:, 0])
             self.causal_sorted = self.causal_snp_data_np[sorted_causal_indices ]
 
+
     def reorder_geno_data_according_to_pheno_sorted_order(self):
         "Reorder the genotype Matrix columns according to the order of phenotype sorted indices order"
         if self.geno_data_np is not None and self.geno_data_np.size > 0  :
             self.geno_data_reordered_pheno = self.geno_data_np[:, self.phone_arg_sorted]
+
 
     def apply_labeling(self, causal_snps_indices, is_sigmoid:bool = False):
         "Label the SNPs, causal ==> 1, None-causal ==> 0"
@@ -180,21 +171,6 @@ class SimulationDataReader:
     def get_causal_snps_indices_after_sorting(self):
         """Return the indices of the causal snps after sorting the causal data"""
         return (self.causal_sorted[:,self.COLUMN]).astype(int)
-    
-    def add_non_causal_snps_samples_randomly(self, total_samples, causal_snps_indices):
-        """The parameter samples that was passed to the program will determine the number of SNPs to take from the total simulation
-            Here we includes first the causal SNPs and later we add None causal SNPs ( the result total(causal snps) + total(None causal snps taken) = samples )
-            The none causal snps are randomly taken
-        """
-        n = total_samples - len(causal_snps_indices) 
-
-        sampled_indices_non_causal_snps = np.random.choice(np.setdiff1d(range(self.geno_data_reordered_pheno.shape[0]),causal_snps_indices), n, replace=False)  
-
-        all_sampled_indices = np.concatenate((sampled_indices_non_causal_snps,causal_snps_indices))
-
-        np.random.shuffle(all_sampled_indices)
-
-        return all_sampled_indices, sampled_indices_non_causal_snps
     
         
     def apply_mds_transformation(self):

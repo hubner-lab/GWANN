@@ -12,7 +12,7 @@ import allel
 import re
 from snapshot import SnapShot
 from plotly.subplots import make_subplots
-
+from const import SNAP
 
 def tanh_map(output, scale=10):
     return np.tanh(scale * (output - 0.5))
@@ -105,16 +105,18 @@ class Run:
 
         X_input = np.expand_dims(createImages(self.width,  sorted_vcf, self.sim_indivduals), axis=-1)  # Add channel dim (height, width, 1)
 
-        Logger(f'Message:', os.environ['LOGGER']).info(f"Loading trained TensorFlow model: {self.model_path}...")
+        self.logger.info(f"Loading trained TensorFlow model: {self.model_path}...")
         model = load_model(self.model_path, compile=False)
 
 
-        Logger(f'Message:', os.environ['LOGGER']).info(f"Running inference on the model...")
+        self.logger.info(f"Running inference on the model...")
         predictions = model.predict(X_input, batch_size=4096)  # batch_size to make the prediction process run faster, multi process created 
 
         output =  predictions[:, 1] # get the 1 class probability
-        SnapShot(X_input,np.round(output), "/mnt/data/amir/GWANN-TEST/GWANN/causal/run_result").save_prediction_tp(f"predicted_as_tp")
-        SnapShot(X_input,np.round(output), "/mnt/data/amir/GWANN-TEST/GWANN/causal_None/run_result").save_prediction_fp(f"predicted_as_fp")
+        if json_get(SNAP):
+            SnapShot(X_input,np.round(output), "./causal/run_result").save_prediction_tp(f"predicted_as_tp")
+            SnapShot(X_input,np.round(output), "./causal_None/run_result").save_prediction_fp(f"predicted_as_fp")
+
         df = pd.DataFrame({"value": output}, index=range(len(output)))
         df.to_csv(f"{self.output_path}.csv")
         self.logger.info(f"Output saved to {self.output_path}.csv")
@@ -195,6 +197,12 @@ class Run:
                 col=i
             )
         fig.update_annotations(font=dict(size=8))
+
+        fig.update_xaxes(
+            tickangle=90,   # vertical labels
+            tickfont=dict(size=10)  # smaller font size
+        )
+                
         fig.update_layout(
             width=120 * len(chrom_labels),  # slightly smaller width scaling
             height=300,

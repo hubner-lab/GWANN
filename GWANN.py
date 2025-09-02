@@ -1,5 +1,6 @@
 import click
 import os
+os.environ['TF_CPP_MIN_LOG_LEVEL'] = '3'
 from Simulate import Simulate
 from train13 import Train  
 from run3 import Run
@@ -10,7 +11,7 @@ import datetime
 from mylogger import Logger
 import time
 import resource
-os.environ['TF_CPP_MIN_LOG_LEVEL'] = '3'
+
 
 
 def log_resource_usage(start_time, logger, label=""):
@@ -47,7 +48,8 @@ class CLIManager:
     @click.option('--model','model',default=None,help="path to the network model generated in the training step")
     @click.option('--output','output_path',default="results/GWAS",help="prefix of output plot and causative SNPs indexes in the VCF")
     @click.option('--transform', '--f', 'func', default="", type=str, help="The name of the function to modify the output (tanh_map, logit_map, log_map)")
-    @click.option('--threshold', '--th', 'th', default=0, type=int, help="Causal classification if  >= threshold (% Prediction)")
+    @click.option('--threshold', '--th', 'th', default=50, type=int, help="Causal classification if  >= threshold (% Prediction)")
+    @click.option('--snap', '--snapshot', 'sp', default=False, is_flag=True, type=bool, help="Snapshots the causal and none causal snps for the predicted SNPs")   
     def run(
         vcf: str,
         pheno_path:str,
@@ -56,6 +58,7 @@ class CLIManager:
         output_path:str,
         func:str,
         th:int,
+        sp: bool
         )-> None:
         """Run GWANN analysis.
 
@@ -71,17 +74,14 @@ class CLIManager:
             output_path (str): Output file prefix for plots and SNP indexes.
             func: The name of the function to modify the output (tanh_map, logit_map, log_map)
             th: Plot resolution begin from this threshold (% Prediction)
+            sp (bool): Snapshots the causal and none causal snps for the predicted SNPs
         """
         start_time = time.time()
 
         modelPath = json_get(MODEL_NAME) 
         modelPath = modelPath if model is None else model
         os.environ['LOGGER'] = f'{LOGGER_DIR}/{LOGGER_FILE_RUN}_{datetime.datetime.now().strftime("%Y-%m-%d_%H-%M-%S")}.log'
-        Logger(f'Message:', f"{os.environ['LOGGER']}").debug(
-            f"Running GWANN analysis with VCF: {vcf},\
-              phenotype path: {pheno_path}, trait: {trait},\
-              model: {modelPath}, output path: {output_path},\
-              threshold: {th}, function: {func}")
+        Logger(f'Message:', f"{os.environ['LOGGER']}").debug(f"Running GWANN analysis with VCF: {vcf}, phenotype path: {pheno_path}, trait: {trait}, model: {modelPath}, output path: {output_path}, threshold: {th}, function: {func}, Snapshots: {sp}")
         
         Run(vcf, pheno_path, trait, modelPath, output_path, func, th).start()
 
@@ -133,7 +133,7 @@ class CLIManager:
         """
         start_time = time.time()
         os.environ['LOGGER'] = f'{LOGGER_DIR}/{LOGGER_FILE_SIMULATE}_{datetime.datetime.now().strftime("%Y-%m-%d_%H-%M-%S")}.log'
-        
+
         Logger(f'Message:', f"{os.environ['LOGGER']}").debug(
             f"Simulating {n_sim} populations with {pop} SNPs, \
             {subpop} subpopulations, {n_samples} samples, \
@@ -193,7 +193,7 @@ class CLIManager:
         """
         
         start_time = time.time()
-
+        os.environ['LOGGER'] = f'{LOGGER_DIR}/{LOGGER_FILE_TRAIN}_{datetime.datetime.now().strftime("%Y-%m-%d_%H-%M-%S")}.log'
         samples = json_get(SAMPLES)
         if  samples % width != 0 and width > 0 or width == 0:
             Logger(f'Error:', f"{os.environ['LOGGER']}").error(f"Image width {width} must be a divisor of the number of individuals {samples}")
@@ -206,14 +206,9 @@ class CLIManager:
         json_update(GENOMEMODEL, gm)
         json_update(SNAP, sp)
 
-        os.environ['LOGGER'] = f'{LOGGER_DIR}/{LOGGER_FILE_TRAIN}_{datetime.datetime.now().strftime("%Y-%m-%d_%H-%M-%S")}.log'
-        Logger(
-            f'Message:',
-            f"{os.environ['LOGGER']}").debug(
-                f"Training with {epochs} epochs, {n_snps} sampled-SNPs, \
-                batch-size: {batch}, ratio: {ratio}, width: {width},\
-                path: {sim_path}, model-name: {model_name},\
-                mds: {mds}, lr: {lr}, gene-model: {gm}")
+
+        Logger(f'Message:',f"{os.environ['LOGGER']}").debug(
+                f"Training with {epochs} epochs, {n_snps} sampled-SNPs, batch-size: {batch}, ratio: {ratio}, width: {width}, path: {sim_path}, model-name: {model_name}, mds: {mds}, lr: {lr}, gene-model: {gm}, Snapshots: {sp}")
         
         total_simulations = json_get(SIMULATIONS)
         Train(model_name, total_simulations, n_snps, width, batch,lr ,epochs,mds, sim_path, ratio).run()
@@ -253,7 +248,6 @@ class CLIManager:
 
 
 
-# Entry point for the CLI application
 if __name__ == "__main__":
     manager = CLIManager()
     manager.start()

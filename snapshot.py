@@ -2,7 +2,6 @@
 
 import numpy as np
 import os
-from PIL import Image
 from genomeToImage import GenomeImage
 class SnapShot:
     def __init__(self, X, labels, save_dir, creat_numpy=False):
@@ -44,7 +43,6 @@ class SnapShot:
         tp_samples = self._get_samples()
         SAMPLES = 100
 
-        # If more than 100, randomly choose 100 without replacement
         if len(tp_samples) > SAMPLES:
             indices = np.random.choice(len(tp_samples), SAMPLES, replace=False)
             tp_samples = tp_samples[indices]
@@ -64,10 +62,9 @@ class SnapShot:
         filename (str): The name of the file to save the snapshot to.
         """
         os.makedirs(self.save_dir, exist_ok=True)
-        SAMPLES = 10
+        SAMPLES = 3
 
         tp_samples = self._get_samples(label=0)
-        # If more than 10, randomly choose 10 without replacement
         if len(tp_samples) > SAMPLES:
             indices = np.random.choice(len(tp_samples), SAMPLES, replace=False)
             tp_samples = tp_samples[indices]
@@ -90,7 +87,6 @@ class SnapShot:
         tp_samples = self._get_samples(label=0)
         SAMPLES = 100
 
-        # If more than 100, randomly choose 100 without replacement
         if len(tp_samples) > SAMPLES:
             indices = np.random.choice(len(tp_samples), SAMPLES, replace=False)
             tp_samples = tp_samples[indices]

@@ -1,20 +1,17 @@
 from dataset4 import Dataset
-from sklearn.model_selection import train_test_split 
 import numpy as np
 from const import MODEL_PATH_TENSOR_DIR
 from mylogger import Logger
 import os 
 from utilities import json_update
-from net5 import ModelBuilder  # assuming net3 is updated with softmax support
+from net5 import ModelBuilder
 from tensorflow.keras.utils import to_categorical
 from tensorflow.keras.callbacks import ModelCheckpoint, ReduceLROnPlateau, EarlyStopping
-from tensorflow.keras.optimizers import SGD, Adam
+from tensorflow.keras.optimizers import Adam
 from sklearn.metrics import precision_score, recall_score, f1_score, average_precision_score
 from TrainingVisualizer import TrainingVisualizer
 from sklearn.metrics import matthews_corrcoef
 from tensorflow.keras import backend as K
-from snapshot import SnapShot
-
 
 
 def f1_m(y_true, y_pred):
@@ -28,6 +25,7 @@ def f1_m(y_true, y_pred):
 
     f1 = 2*p*r / (p+r+K.epsilon())
     return K.mean(f1)
+
 
 class Train:
     def __init__(self, model_name:str, total_simulations:int,
@@ -45,10 +43,12 @@ class Train:
         self.test_ratio = test_ratio
         self.logger = Logger(f'Message:', f"{os.environ['LOGGER']}")
     
+
     def shuffle_data(self, X, y):
         idx = np.arange(len(X))
         np.random.shuffle(idx)
         return X[idx], y[idx]
+    
     
     def data_splitter(self):
         tp_indices = np.where(self.dataset.y.numpy() == 1)
@@ -121,16 +121,6 @@ class Train:
         self.logger.info("Splitting data into training and testing sets...")
 
         X_train, X_val, X_test, y_train, y_val, y_test = self.data_splitter()
-        
-        # SnapShot(X_train, y_train, "./causal/train").save_snapshot_tp(f"train_tp")
-        # SnapShot(X_val, y_val, "./causal/train").save_snapshot_tp(f"val_tp")    
-        # SnapShot(X_test, y_test, "./causal/train").save_snapshot_tp(f"test_tp")
-
-
-        # SnapShot(X_train, y_train, "./causal_None/train").save_snapshot_fp(f"train_fp")
-        # SnapShot(X_val, y_val, "./causal_None/train").save_snapshot_fp(f"val_fp")    
-        # SnapShot(X_test, y_test, "./causal_None/train").save_snapshot_fp(f"test_fp")
-        
 
         self.logger.debug(f"y_train True labels: {len(y_train[y_train == 1]) }")
         self.logger.debug(f"y_train False labels: {len(y_train[y_train == 0]) }")
@@ -139,10 +129,6 @@ class Train:
         self.logger.debug(f"y_val True labels: {len(y_val[y_val == 1]) }")
         self.logger.debug(f"y_val False labels: {len(y_val[y_val == 0]) }")
 
-
-        class_weights = {0:1, 1:1}
-
-        self.logger.info(f"Class weights: {class_weights}")
         
         y_train = to_categorical(y_train, 2)
         y_test = to_categorical(y_test, 2)
@@ -197,7 +183,6 @@ class Train:
                   epochs=self.epochs, 
                   batch_size=self.batch_size, 
                   callbacks=[checkpoint_cb, early_stopping_cb, lr_scheduler],
-                #   class_weight=class_weights,
                   verbose=1)
 
         json_update("model_name", f"{MODEL_PATH_TENSOR_DIR}/{self.model_name}.h5")
@@ -227,7 +212,6 @@ class Train:
 
         mcc = matthews_corrcoef(y_test_labels, y_pred_labels)
         self.logger.info(f'Matthews Correlation Coefficient: {mcc:.4f}')
-
         visualizer = TrainingVisualizer(f'./metrics/{self.batch_size}_{self.learning_rate}_{self.dataset.sampledSitesIncludeCausals}')  
         visualizer.plot_confusion_matrix(y_test_labels, y_pred_labels)
         visualizer.plot_precision_recall(y_test[:, 1], y_pred_probs[:, 1]) 
