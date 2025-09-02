@@ -4,7 +4,7 @@ from sklearn.metrics import (
     confusion_matrix, ConfusionMatrixDisplay,
     precision_recall_curve, roc_curve, auc
 )
-import numpy as np
+
 
 class TrainingVisualizer:
     def __init__(self, save_dir="./"):
@@ -36,6 +36,7 @@ class TrainingVisualizer:
         plt.savefig(f"{self.save_dir}/training_history.png")
         plt.close()
 
+
     def plot_confusion_matrix(self, y_true, y_pred):
         cm = confusion_matrix(y_true, y_pred)
         disp = ConfusionMatrixDisplay(confusion_matrix=cm)
@@ -43,6 +44,7 @@ class TrainingVisualizer:
         plt.title("Confusion Matrix")
         plt.savefig(f"{self.save_dir}/confusion_matrix.png")
         plt.close()
+
 
     def plot_precision_recall(self, y_true, y_probs):
         precision, recall, _ = precision_recall_curve(y_true, y_probs)
@@ -55,6 +57,7 @@ class TrainingVisualizer:
         plt.legend()
         plt.savefig(f"{self.save_dir}/pr_curve.png")
         plt.close()
+
 
     def plot_roc_curve(self, y_true, y_probs):
         fpr, tpr, _ = roc_curve(y_true, y_probs)
@@ -70,6 +73,7 @@ class TrainingVisualizer:
         plt.savefig(f"{self.save_dir}/roc_curve.png")
         plt.close()
         
+        
     def plot_learning_rate(self, history):
         if 'lr' not in history.history:
             print("Learning rate history not found in training history.")
@@ -84,6 +88,7 @@ class TrainingVisualizer:
         plt.legend()
         plt.savefig(f"{self.save_dir}/learning_rate.png")
         plt.close()
+    
     
     def plot_f1_score(self, history):
         if 'f1_m' not in history.history and 'val_f1_m' not in history.history:

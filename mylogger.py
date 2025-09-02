@@ -1,6 +1,8 @@
 import logging
 
 class Logger:
+
+
     _instance = None
 
     def __new__(cls, name: str = 'my_logger', log_file: str = 'logs/app.log', level: int = logging.DEBUG):
@@ -8,6 +10,7 @@ class Logger:
             cls._instance = super(Logger, cls).__new__(cls)
             cls._instance.__initialize_logger(name, log_file, level)
         return cls._instance
+
 
     def __initialize_logger(self, name: str, log_file: str, level: int):
         self.logger = logging.getLogger(name)
@@ -29,11 +32,14 @@ class Logger:
         self.logger.addHandler(file_handler)
         self.logger.addHandler(console_handler)
 
+
     def debug(self, message: str):
         self.logger.debug(message)
 
+
     def info(self, message: str):
         self.logger.info(message)
+
 
     def error(self, message: str):
         self.logger.error(message)

@@ -14,9 +14,11 @@ import shlex
 import subprocess
 from mylogger import Logger
 
+
 class Simulate:
 
     DEPOLIDS = 2
+    
     def __init__(self, SNPs: int, subpop: int, n_samples: int, n_sim: int, causalSNPs: int, maf: float, miss: float, equal: bool, debug: bool, delete: bool):
         """
         Initialize the simulation parameters.

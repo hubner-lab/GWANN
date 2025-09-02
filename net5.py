@@ -2,9 +2,12 @@ from keras import layers, Input, Model
 import tensorflow as tf
 
 class ModelBuilder:
+
+
     def __init__(self, height, width):
         self.height = height
         self.width = width
+
 
     def build(self):
         matrix_input = Input(shape=(self.height, self.width, 1))
@@ -24,6 +27,7 @@ class ModelBuilder:
         output = layers.Dense(2, activation='softmax')(x)
 
         return Model(inputs=matrix_input, outputs=output)
+
 
     def model_summary(self):
         model = self.build()

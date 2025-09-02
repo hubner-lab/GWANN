@@ -6,6 +6,7 @@ import tensorflow as tf
 import os 
 from mylogger import Logger
 
+
 def json_update(key: str ,param:Any) -> None:
     """
     Update the JSON file with a new value for the specified key.
@@ -25,7 +26,6 @@ def json_get(key:str):
         tmp_dict = json.loads(JSON_FILE.read_text())
         return tmp_dict[key] if key in tmp_dict else None 
     return current_dict[key]
-
 
 
 def createImages(columns, data, sim_indivduals):

@@ -13,7 +13,6 @@ import time
 import resource
 
 
-
 def log_resource_usage(start_time, logger, label=""):
     end_time = time.time()
     usage = resource.getrusage(resource.RUSAGE_SELF)
@@ -30,6 +29,8 @@ def log_resource_usage(start_time, logger, label=""):
     logger.info(f"\033[94m{label} - System CPU time: {sys_cpu:.2f}s\033[0m")  
 
 class CLIManager:
+
+    
     def __init__(self):
         """Initialize the CLI Manager.
         

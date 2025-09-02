@@ -14,6 +14,7 @@ from snapshot import SnapShot
 from plotly.subplots import make_subplots
 from const import SNAP
 
+
 def tanh_map(output, scale=10):
     return np.tanh(scale * (output - 0.5))
 
@@ -33,10 +34,11 @@ def log_map(output):
     return  SCALE* resNorm
 
 
-
-
 class Run:
+
+
     GeneModel = {'recessive':0,'dominant':1,'additive':0.5,'noHet':-1}
+
     def __init__(self,vcf, pheno_path, trait,model, output_path,func, th):
         self.vcf = vcf
         self.pheno_path = pheno_path
@@ -73,6 +75,7 @@ class Run:
             raise ValueError('Trait field missing in phenotype file')
         return callset['variants/POS'],callset['calldata/GT'], callset['samples'], callset['variants/CHROM'], pheno 
 
+
     def calc_avg_vcf(self, vcf_data):
 
         tmp_vcf = vcf_data[:, :, 0] + vcf_data[:, :, 1]
@@ -82,6 +85,7 @@ class Run:
 
         return tmp_vcf
     
+
     def get_output_modified(self,output, funcName = ""):
         """
         Get the output of a function by modifying the function name.
@@ -100,6 +104,7 @@ class Run:
             SCALE = 100
             return SCALE* output
         
+
     def load_model_and_predict(self, sorted_vcf, funcName=""):
         
 
@@ -150,6 +155,7 @@ class Run:
         sorted_labels = [label for _, label in sorted(zip(sort_keys, chrom_arr))]       
         return sorted_labels
     
+
     def plot_data(self, positions, chrom, output):
         chrom_labels = self.filter_chrom(chrom)
         self.logger.info(f"Generating per-chromosome horizontal subplots with Plotly...")
@@ -214,6 +220,7 @@ class Run:
 
         fig.write_html(f"{self.output_path}_subplots_horizontal_tight.html")
         self.logger.info(f"Tight horizontal subplots saved to {self.output_path}_subplots_horizontal_tight.html")
+
 
     def start(self):
         """Run on real data using a trained TensorFlow model"""

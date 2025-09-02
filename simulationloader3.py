@@ -6,12 +6,15 @@ from const import TOTAL_SNPS
 
 
 class SimulationDataReader:
+
     ALLELE_MAPPING = {'A': 1, 'T': 0, '0': -1}
     GENMODEL={"minor" : 0, "major" : 2, "heterozygote" : 1, "missing" : -1}
     PED_COLUMNS = ['Family_ID', 'Individual_ID', 'Paternal_ID', 'Maternal_ID', 'Sex', 'Phenotype']
     SUFFIX_GENO_PED = '0.ped'
     SUFFIX_CAUSAL = '0.causal'
     COLUMN = 1 
+
+
     def __init__(self, base_path:str, mds_flag:bool):
         self.base_path = base_path
         self.geno_data_pd = None
@@ -88,8 +91,6 @@ class SimulationDataReader:
 
         self.pheno_data_np = self.geno_data_pd['Phenotype'].to_numpy()
 
-
-        
         
     def load(self, index, total_samples=None):
         ped_geno_file = f'{self.base_path}{index}{self.SUFFIX_GENO_PED}'

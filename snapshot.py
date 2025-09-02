@@ -11,12 +11,12 @@ class SnapShot:
         self.createt_numpy = creat_numpy
         self.genome_image = GenomeImage(1,1)  # Dummy initialization
     
+
     def _get_samples(self, label=1):
         tp_indices = np.where(self.labels == label)[0]
         tp_samples = self.X[tp_indices]
         return tp_samples
     
-
 
     def save_snapshot_tp(self, filename: str) -> None:
         """
@@ -31,6 +31,7 @@ class SnapShot:
                 file_path = os.path.join(self.save_dir, f"{filename}_sample_{i}.npy")
                 np.save(file_path, sample)
             self.genome_image.plot_sample(self.save_dir,sample, f"{filename}_sample_{i}")
+    
     
     def save_prediction_tp(self, filename: str) -> None:
         """
