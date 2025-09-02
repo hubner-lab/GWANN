@@ -74,16 +74,13 @@ python3 GWANN.py run --vcf ./vcf_data/Ha412_Jan2017.vcf.gz --pheno ./vcf_data/BR
 ```bash
 python3 GWANN.py --help
 
-Usage: GWANN.py [OPTIONS] COMMAND [ARGS]...
-
-Options:
-  --help  Show this message and exit.
+Usage: GWANN.py [COMMAND] [ARGS]...
 
 Commands:
-  run       Run GWANN analysis.
-  simulate  Simulate genetic data for GWANN analysis.
-  train     Train the model for GWANN analysis.
-
+  run         Run GWANN analysis.
+  simulate    Simulate genetic data for GWANN analysis.
+  train       Train the model for GWANN analysis.
+  --help      Show this message and exit.
 ```
 
 ```bash
@@ -92,24 +89,17 @@ python3 GWANN.py simulate --help
 Usage: GWANN.py simulate [OPTIONS]
 
 Options:
-  -p, --number-of-snps INTEGER    Number of SNPs in each simulation
-                                  [required]
-  -P, --number-of-subpopulations INTEGER
-                                  Number of expected subpopulations
-                                  [required]
-  -s, --samples INTEGER           Number of individuals  [required]
-  -n, --number-of-simulation INTEGER
-                                  Number of populations to be simulated
-                                  [required]
-  -S, --causal-snps INTEGER       Number of causal SNPs expected per number of
-                                  SNP-sites
-  -m, --maf FLOAT                 Minor allele frequency
-  --miss FLOAT                    Proportion of missing data
-  --equal-variance                Set this if equal variance is expected among
-                                  SNPs (ignore for single SNP)
-  --verbose                       Increase verbosity
-  --delete                        Delete the current simulated files
-  --help                          Show this message and exit.
+  -p, --number-of-snps           INTEGER    Number of SNPs in each simulation [required]
+  -P, --number-of-subpopulations INTEGER    Number of expected subpopulations [required]
+  -s, --samples                  INTEGER    Number of indi viduals  [required]
+  -n, --number-of-simulation     INTEGER    Number of populations to be simulated [required]
+  -S, --causal-snps              INTEGER    Number of causal SNPs expected per number of SNP-sites
+  -m, --maf                      FLOAT      Minor allele frequency  0<= maf <= 1  
+  --miss                         FLOAT      Proportion of missing data  0<= miss <= 1  
+  --equal-variance               BOOL       Set this if equal variance is expected among SNPs (ignore for single SNP)
+  --verbose                      BOOL       Increase verbosity
+  --delete                       BOOL       Delete the current simulated files
+  --help                                    Show this message and exit.
 ```
 
 ```bash
@@ -118,19 +108,18 @@ python3 GWANN.py train  --help
 Usage: GWANN.py train [OPTIONS]
 
 Options:
-  --help                     Show this message and exit.
-  -M,  --MN TEXT              Model name to be saved  [required]
-  -e,  --epochs INTEGER       Number of training iterations
-  -S,  --SNPs INTEGER         Number of SNP sites to be randomly sampled per simulation [required]  
-  -b,  --batch INTEGER        Batch size
-  -lr, --lrate float          learning rate for the model
-  -r,  --ratio FLOAT          Train/Test ratio 
-  -w,  --width INTEGER        Image width must be a divisor of the number of individuals
-  --path TEXT                Path to the simulated data  [required]
-  --mds                      Apply mds transformation on the phenotype matrix, add
-                             TN to avoid population structure
-  --geneModel, --GM TEXT     Choose one of the four models, where the heterozygote (value = 1) is 
-                             represented as: minor = 0, major = 2, heterozygote = 1, missing = -1.
+  -M,  --MN         STRING     Model name to be saved  [required]
+  -e,  --epochs     INTEGER    Number of training iterations
+  -S,  --SNPs       INTEGER    Number of SNP sites to be randomly sampled per simulation [required]  
+  -b,  --batch      INTEGER    Batch size
+  -lr, --lrate      FLOAT      learning rate for the model
+  -r,  --ratio      FLOAT      Train/Test ratio 
+  -w,  --width      INTEGER    Image width must be a divisor of the number of individuals
+  --path            STRING     Path to the simulated data  [required]
+  --mds             BOOL       Apply mds transformation on the phenotype matrix, add TN to avoid population structure
+  --geneModel, --GM STRING     Choose one of the four models, where the heterozygote (value = 1) is 
+                               represented as: minor = 0, major = 2, heterozygote = 1, missing = -1.
+  --help                       Show this message and exit.
 ```
 
 ```bash
@@ -139,22 +128,14 @@ python3 GWANN.py run  --help
 Usage: GWANN.py run [OPTIONS]
 
 Options:
-  -v, --vcf TEXT             path to the VCF file  [required]
-  -p, --pheno TEXT           path to the phenotype file (comma seperated csv
-                             file)  [required]
-  -t, --trait TEXT           name of the trait (header in the phenotype file)
-                             [required]
-  --model TEXT               path to the network model generated in the
-                             training step
-  --output TEXT              prefix of output plot and causative SNPs indexes
-                             in the VCF
-  --transform, --f TEXT      The name of the function to modify the output
-                             (tanh_map, logit_map, log_map)
-  --threshold, --th INTEGER  Causal classification if  >= threshold (% Prediction))
-  --help                     Show this message and exit
+  -v, --vcf         STRING      path to the VCF file  [required]
+  -p, --pheno       STRING      path to the phenotype file (comma seperated csv file)  [required]
+  -t, --trait       STRING      name of the trait (header in the phenotype file) [required]
+  --model           STRING      path to the network model generated in the training step
+  --output          STRING      prefix of output plot and causative SNPs indexes in the VCF
+  --transform, --f  STRING      The name of the function to modify the output(tanh_map, logit_map, log_map)
+  --threshold, --th INTEGER     Causal classification if  >= threshold (% Prediction))
+  --help                        Show this message and exit
 ```
-
-
-
 ## Net 
 ![net](images/model_visualization_3D.png "net")

@@ -17,3 +17,4 @@ causal/run_result/*
 causal/simloader/*
 causal_None/run_result/*
 causal_None/simloader/*
+visualize_net.py
