@@ -120,6 +120,7 @@ Options:
   --mds             BOOL       Apply mds transformation on the phenotype matrix, add TN to avoid population structure
   --geneModel, --GM STRING     Choose one of the four models, where the heterozygote (value = 1) is 
                                represented as: minor = 0, major = 2, heterozygote = 1, missing = -1.
+  --snape           BOOL       Save simulated causal and non-causal SNPs images to ./causal/simloader and ./causal_None/simloader.
   --help                       Show this message and exit.
 ```
 
@@ -136,6 +137,7 @@ Options:
   --output          STRING      prefix of output plot and causative SNPs indexes in the VCF
   --transform, --f  STRING      The name of the function to modify the output(tanh_map, logit_map, log_map)
   --threshold, --th INTEGER     Causal classification if  >= threshold (% Prediction))
+  --snape           BOOL       Save predicted causal and non-causal SNPs images to ./causal/simloader and ./causal_None/simloader.
   --help                        Show this message and exit
 ```
 ## Net 
