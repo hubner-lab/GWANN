@@ -58,9 +58,9 @@ chmod u+x test_data.sh
 # 5% minor allele frequency, 3% missing data
 python3 GWANN.py simulate -p 10000 -s 300 -n 100 --maf 0.05 --miss 0.03 -P 1 -S 2
 
-# Train the network for 1000 epochs with a randomly sampled 50 SNP (causative SNP included)
+# Train the network for 1000 epochs with a randomly sampled 70 SNP (causative SNP included) per simulation
 # a training-validation ratio of 70/30, image width of 20 columns, the path to the simulated data, the model name, learning rate 0.01, and snap images set to true 
-python3 GWANN.py train --batch 1000 -S 50 --path ./simulation/data/ -e 1000 -r 0.3 --width 20 -M model1 -lr 0.01 --snap
+python3 GWANN.py train --batch 64 -S 70 --path ./simulation/data/ -e 1000 -r 0.3 --width 20 -M model1 -lr 0.01 --snap
 
 # Predict causative SNPs using the trained model model1_best.h5 on real data INPUT.vcf.gz with trait Plant_Height
 # using the model generated in previous step and output results to output.csv and res.html, 
