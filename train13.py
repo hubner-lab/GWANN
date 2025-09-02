@@ -28,6 +28,7 @@ def f1_m(y_true, y_pred):
 
 
 class Train:
+    
     def __init__(self, model_name:str, total_simulations:int,
                 sampledSitesIncludeCausals: int, columns:int,
                 batch_size:int = 64, learning_rate:float = 0.01,
