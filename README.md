@@ -137,7 +137,7 @@ Options:
   --output          STRING      prefix of output plot and causative SNPs indexes in the VCF
   --transform, --f  STRING      The name of the function to modify the output(tanh_map, logit_map, log_map)
   --threshold, --th INTEGER     Causal classification if  >= threshold (% Prediction))
-  --snape           BOOL        Save predicted causal and non-causal SNPs images to ./causal/simloader and ./causal_None/simloader.
+  --snape           BOOL        Save predicted causal and non-causal SNPs images to ./causal/run_result and ./causal_None/run_result.
   --help                        Show this message and exit
 ```
 ## Net 
