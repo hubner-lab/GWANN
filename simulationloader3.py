@@ -2,7 +2,7 @@ import pandas as pd
 import numpy as np 
 from sklearn.manifold import MDS
 from utilities import json_get
-from const import TOTAL_SNPS 
+from const import TOTAL_SNPS
 
 
 
@@ -16,31 +16,23 @@ class SimulationDataReader:
     count_once = False
     SNP_total = 0
     def __init__(self, base_path:str, mds_flag:bool):
-        self.base_path = base_path
 
+        self.base_path = base_path
         self.sorted_causal_indices = None
         self.geno_data_pd = None
         self.causal_snp_data_pd = None
         self.pheno_data_pd = None
-
-        
         self.geno_data_np = None
         self.causal_snp_data_np = None
         self.pheno_data_np = None
-
-
         self.phone_arg_sorted = None
         self.mds_arg_sorted = None
-
-        # self.pheno_data_sorted = None
         self.geno_data_reordered_pheno = None
         self.geno_data_reordered_mds = None
-
         self.causal_sorted = None
         self.mds_data_sorted = None
         self.labels = None
         self.mds_data = None
-        self.cache = dict()
         self.mds_flag = mds_flag
 
     def run(self, index, total_samples):

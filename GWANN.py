@@ -1,21 +1,16 @@
 import click
 import os
-os.environ['TF_CPP_MIN_LOG_LEVEL'] = '3'
-
 from Simulate import Simulate
-# from train6 import Train  # worked well
-# from train11 import Train  # improved since data is extremely imbalanced
-# from train11_BN import Train # for testing 
 from train13 import Train  
 from run3 import Run
-# from run3_BN import Run
 from utilities import json_get, json_update
 import resource
-from const import SIMULATIONS, LOGGER_DIR
+from const import SIMULATIONS, LOGGER_DIR, SAMPLES, GENOMEMODEL, SNAP, LOGGER_FILE_TRAIN, LOGGER_FILE_SIMULATE, LOGGER_FILE_RUN, MODEL_NAME
 import datetime
 from mylogger import Logger
 import time
 import resource
+os.environ['TF_CPP_MIN_LOG_LEVEL'] = '3'
 
 
 def log_resource_usage(start_time, logger, label=""):
@@ -52,7 +47,7 @@ class CLIManager:
     @click.option('--model','model',default=None,help="path to the network model generated in the training step")
     @click.option('--output','output_path',default="results/GWAS",help="prefix of output plot and causative SNPs indexes in the VCF")
     @click.option('--transform', '--f', 'func', default="", type=str, help="The name of the function to modify the output (tanh_map, logit_map, log_map)")
-    @click.option('--threshold', '--th', 'th', default=50, type=int, help="Causal classification if  >= threshold (% Prediction)")
+    @click.option('--threshold', '--th', 'th', default=0, type=int, help="Causal classification if  >= threshold (% Prediction)")
     def run(
         vcf: str,
         pheno_path:str,
@@ -74,19 +69,22 @@ class CLIManager:
             trait (str): Name of the trait to analyze.
             model (str): Path to the trained model.
             output_path (str): Output file prefix for plots and SNP indexes.
-            cpu (bool): Flag to force CPU usage for computation.
             func: The name of the function to modify the output (tanh_map, logit_map, log_map)
             th: Plot resolution begin from this threshold (% Prediction)
-            gm: Choose one of the four models, where a value of 0.5 is interpreted as follows: recessive = 0, dominant = 1, additive = 0.5, noHet = -1
         """
         start_time = time.time()
-        modelPath = json_get("model_name") 
+
+        modelPath = json_get(MODEL_NAME) 
         modelPath = modelPath if model is None else model
-        json_update("current_command", 'run')
-        LOGGER_FILE = "run"
-        os.environ['LOGGER'] = f'{LOGGER_DIR}/{LOGGER_FILE}_{datetime.datetime.now().strftime("%Y-%m-%d_%H-%M-%S")}.log'
-        Logger(f'Message:', f"{os.environ['LOGGER']}").debug(f"Running GWANN analysis with VCF: {vcf}, phenotype path: {pheno_path}, trait: {trait}, model: {modelPath}, output path: {output_path}, threshold: {th}, function: {func}")
+        os.environ['LOGGER'] = f'{LOGGER_DIR}/{LOGGER_FILE_RUN}_{datetime.datetime.now().strftime("%Y-%m-%d_%H-%M-%S")}.log'
+        Logger(f'Message:', f"{os.environ['LOGGER']}").debug(
+            f"Running GWANN analysis with VCF: {vcf},\
+              phenotype path: {pheno_path}, trait: {trait},\
+              model: {modelPath}, output path: {output_path},\
+              threshold: {th}, function: {func}")
+        
         Run(vcf, pheno_path, trait, modelPath, output_path, func, th).start()
+
         log_resource_usage(start_time,Logger(f'Message:', f"{os.environ['LOGGER']}"),"Run")
         pass
 
@@ -131,11 +129,17 @@ class CLIManager:
             miss (float): Proportion of missing data.
             equal (bool): Set this if equal variance is expected among SNPs (ignore for single SNP)
             debug (bool): Flag to enable verbose logging for debugging.
+            delete (bool): Flag to delete the current simulated files.
         """
         start_time = time.time()
-        LOGGER_FILE = "simulate"
-        os.environ['LOGGER'] = f'{LOGGER_DIR}/{LOGGER_FILE}_{datetime.datetime.now().strftime("%Y-%m-%d_%H-%M-%S")}.log'
-        Logger(f'Message:', f"{os.environ['LOGGER']}").debug(f"Simulating {n_sim} populations with {pop} SNPs, {subpop} subpopulations, {n_samples} samples, {n_snps} causal SNPs, MAF: {maf}, missing data: {miss}, equal variance: {equal}")
+        os.environ['LOGGER'] = f'{LOGGER_DIR}/{LOGGER_FILE_SIMULATE}_{datetime.datetime.now().strftime("%Y-%m-%d_%H-%M-%S")}.log'
+        
+        Logger(f'Message:', f"{os.environ['LOGGER']}").debug(
+            f"Simulating {n_sim} populations with {pop} SNPs, \
+            {subpop} subpopulations, {n_samples} samples, \
+            {n_snps} causal SNPs, MAF: {maf}, missing data: {miss}, \
+            equal variance: {equal}")
+        
         Simulate(pop, subpop, n_samples, n_sim, n_snps, maf, miss, equal, debug, delete).simulate()
         log_resource_usage(start_time,Logger(f'Message:', f"{os.environ['LOGGER']}"), "Simulate")
 
@@ -146,12 +150,13 @@ class CLIManager:
     @click.option('-e', '--epochs', 'epochs', default=100, type=int, help="Number of training iterations")
     @click.option('-S', '--SNPs', 'n_snps', required=True, type=int, help="Number of SNP sites to be randomly sampled per batch")
     @click.option('-b', '--batch', 'batch', default=64, type=int, help="Batch size")
-    @click.option('-l', '--lrate', 'lr', default=0.01, type=float, help="learning rate for the model")
+    @click.option('-lr', '--lrate', 'lr', default=0.01, type=float, help="learning rate for the model")
     @click.option('-r', '--ratio', 'ratio', default=0.8, type=float, help="Train/Test ratio")
     @click.option('-w', '--width', 'width', default=15, type=int, help="Image width must be a divisor of the number of individuals")
     @click.option('--path', 'sim_path', required=True, type=str, help="Path to the simulated data")
     @click.option('--mds', 'mds', default=False,is_flag=True, type=bool, help="Apply mds transformation on the phenotype matrix, add TN to avoid population structure")
-    @click.option('--geneModel', '--GM', 'gm', default="heterozygote", type=str, help="Choose one of the four models:minor (0), major(2), missing (-1), and heterozygote (1)")  
+    @click.option('--geneModel', '--GM', 'gm', default="heterozygote", type=str, help="Choose one of the four models:minor (0), major(2), missing (-1), and heterozygote (1)")
+    @click.option('--snap', '--snapshot', 'sp', default=False, is_flag=True, type=bool, help="Snapshots the causal and none causal snps while loading the data")   
     def train(
         model_name: str,
         epochs: int, 
@@ -162,7 +167,8 @@ class CLIManager:
         lr: float,
         sim_path: str,
         mds: bool,
-        gm: str
+        gm: str,
+        sp: bool
     ) -> None:
         """Train the model for GWANN analysis.
 
@@ -171,26 +177,44 @@ class CLIManager:
         and training/evaluation split ratio.
 
         Args:
+            model_name (str): Name to save the trained model.
             epochs (int): Number of epochs (training iterations).
             n_snps (int): Number of SNPs to sample per batch.
             batch (int): Batch size for training.
             ratio (float): Ratio of training data to evaluation data (train/eval split).
             width (int): Image width for data processing.
             sim_path (str): Path to the directory containing the simulated data.
-            debug (bool): Flag to enable verbose logging for debugging.
-            deterministic (bool): Flag to ensure deterministic results for reproducibility.
-            cpu (bool): Flag to force training on CPU.
-        
+            mds (bool): Flag to apply MDS transformation on the phenotype matrix.
+            gm (str): Choose one of the four models: minor (0), major (2), missing (-1), and heterozygote (1).
+            sp (bool): Snapshots the causal and none causal snps while loading the data
+
         Returns:
             None: This function does not return any value.
         """
-        json_update("gene_model", gm)
+        
         start_time = time.time()
-        LOGGER_FILE = "train"
-        os.environ['LOGGER'] = f'{LOGGER_DIR}/{LOGGER_FILE}_{datetime.datetime.now().strftime("%Y-%m-%d_%H-%M-%S")}.log'
+
+        samples = json_get(SAMPLES)
+        if  samples % width != 0 and width > 0 or width == 0:
+            Logger(f'Error:', f"{os.environ['LOGGER']}").error(f"Image width {width} must be a divisor of the number of individuals {samples}")
+            raise ValueError(f"Image width {width} must be a divisor of the number of individuals {samples}")
+        
+        if gm not in ["minor", "major", "missing", "heterozygote"]:
+            Logger(f'Error:', f"{os.environ['LOGGER']}").error(f"gene-model {gm} is not recognized, choose one of: minor, major, missing, heterozygote")
+            raise ValueError(f"gene-model {gm} is not recognized, choose one of: minor, major, missing, heterozygote")
+        
+        json_update(GENOMEMODEL, gm)
+        json_update(SNAP, sp)
+
+        os.environ['LOGGER'] = f'{LOGGER_DIR}/{LOGGER_FILE_TRAIN}_{datetime.datetime.now().strftime("%Y-%m-%d_%H-%M-%S")}.log'
         Logger(
             f'Message:',
-            f"{os.environ['LOGGER']}").debug(f"Training with {epochs} epochs, {n_snps} sampled-SNPs, batch-size: {batch}, ratio: {ratio}, width: {width}, path: {sim_path}, model-name: {model_name}, mds: {mds}, lr: {lr}, gene-model: {gm}")
+            f"{os.environ['LOGGER']}").debug(
+                f"Training with {epochs} epochs, {n_snps} sampled-SNPs, \
+                batch-size: {batch}, ratio: {ratio}, width: {width},\
+                path: {sim_path}, model-name: {model_name},\
+                mds: {mds}, lr: {lr}, gene-model: {gm}")
+        
         total_simulations = json_get(SIMULATIONS)
         Train(model_name, total_simulations, n_snps, width, batch,lr ,epochs,mds, sim_path, ratio).run()
         log_resource_usage(start_time,Logger(f'Message:', f"{os.environ['LOGGER']}"), "Train")

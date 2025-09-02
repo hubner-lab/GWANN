@@ -11,6 +11,7 @@ import plotly.graph_objects as go
 import allel
 import re
 from snapshot import SnapShot
+from plotly.subplots import make_subplots
 
 
 def tanh_map(output, scale=10):
@@ -147,86 +148,64 @@ class Run:
         sorted_labels = [label for _, label in sorted(zip(sort_keys, chrom_arr))]       
         return sorted_labels
     
-    def plot_data(self,positions, chrom, output):
-    
+    def plot_data(self, positions, chrom, output):
         chrom_labels = self.filter_chrom(chrom)
+        self.logger.info(f"Generating per-chromosome horizontal subplots with Plotly...")
 
-        self.logger.info(f"Generating scatter plot with Plotly...")
-
-        x_ticks = []
-        x_tick_labels = []
-        current_position = 0
-        fig = go.Figure()
-
-        for i, chr_label in enumerate(chrom_labels):
-            chr_indices = np.where(chrom == chr_label)[0]
-            positions_chr = positions[chr_indices]
-            post_sorted_args = np.argsort(positions_chr)
-            chr_indices = chr_indices[post_sorted_args]
-            chr_outputs = output[chr_indices]
-        
-    
-            
-            x_chr = np.arange(current_position, current_position + len(chr_indices))
-
-            # Alternate color: even index = blue, odd index = black
-            color = 'blue' if i % 2 == 0 else 'red'
-
-            fig.add_trace(go.Scattergl(
-                x=x_chr,
-                y=chr_outputs,
-                mode='markers',
-                name=chr_label,
-                marker=dict(size=3, opacity=0.6, color=color)
-            ))
-
-            x_ticks.append(current_position + len(chr_indices) // 2)
-            x_tick_labels.append(chr_label)
-
-            current_position += len(chr_indices)
-
-        # Adding the 50% threshold line, aligned with the chromosome x-axis, and color-coded (green)
-        fig.update_layout(
-            title="Prediction of SNPs associated with the trait.",
-            xaxis=dict(tickmode='array', tickvals=x_ticks, ticktext=x_tick_labels, title="Chromosome"),
-            yaxis=dict(title="Prediction(%)", range=[self.th, 100]),
-            showlegend=True,
-            shapes=[
-                dict(
-                    type='line',
-                    x0=0,
-                    x1=current_position,  # spans the full x-axis range aligned with chromosomes
-                    y0=50,
-                    y1=50,
-                    line=dict(color='green', width=2, dash='dash'),
-                    name="50% Threshold Line"
-                )
-            ],
-            updatemenus=[
-                dict(
-                    type="buttons",
-                    direction="right",
-                    x=1,
-                    y=1,
-                    buttons=[
-                        dict(
-                            label="Show 50% Line",
-                            method="relayout",
-                            args=[{"shapes[0].visible": True}]
-                        ),
-                        dict(
-                            label="Hide 50% Line",
-                            method="relayout",
-                            args=[{"shapes[0].visible": False}]
-                        )
-                    ]
-                )
-            ]
-
+        # Create subplots: 1 row, multiple columns
+        fig = make_subplots(
+            rows=1,
+            cols=len(chrom_labels),
+            shared_yaxes=True,
+            subplot_titles=chrom_labels,
+            horizontal_spacing=0.001  # super small spacing
         )
 
-        fig.write_html(f"{self.output_path}.html")
-        self.logger.info(f"Scatter plot saved to {self.output_path}.html")
+        for i, chr_label in enumerate(chrom_labels, start=1):
+            chr_indices = np.where(chrom == chr_label)[0]
+            positions_chr = positions[chr_indices]
+
+            # sort SNPs within chromosome
+            post_sorted_args = np.argsort(positions_chr)
+            chr_indices = chr_indices[post_sorted_args]
+            positions_chr = positions_chr[post_sorted_args]
+            chr_outputs = output[chr_indices]
+
+            # Alternate colors
+            color = "blue" if i % 2 == 0 else "red"
+
+            # Add SNP scatter for this chromosome into its subplot
+            fig.add_trace(
+                go.Scattergl(
+                    x=positions_chr,
+                    y=chr_outputs,
+                    mode="markers",
+                    name=chr_label,
+                    marker=dict(size=2, opacity=0.6, color=color)
+                ),
+                row=1,
+                col=i
+            )
+
+            # Add 50% threshold line for this subplot
+            fig.add_hline(
+                y=50,
+                line=dict(color="green", width=2, dash="dash"),
+                row=1,
+                col=i
+            )
+        fig.update_annotations(font=dict(size=8))
+        fig.update_layout(
+            width=120 * len(chrom_labels),  # slightly smaller width scaling
+            height=300,
+            title="Prediction of SNPs associated with the trait (per chromosome).",
+            yaxis_title="Prediction(%)",
+            showlegend=False,
+            margin=dict(l=40, r=40, t=80, b=40)  # keep layout clean
+        )
+
+        fig.write_html(f"{self.output_path}_subplots_horizontal_tight.html")
+        self.logger.info(f"Tight horizontal subplots saved to {self.output_path}_subplots_horizontal_tight.html")
 
     def start(self):
         """Run on real data using a trained TensorFlow model"""

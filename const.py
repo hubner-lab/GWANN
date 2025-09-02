@@ -3,6 +3,12 @@ from pathlib import Path
 SIMULATIONS = "simulations"
 SAMPLES = "samples"
 TOTAL_SNPS = "total_snps"
+MODEL_NAME= "model_name"
+GENOMEMODEL = "gene_model"
+LOGGER_FILE_TRAIN = "train"
+LOGGER_FILE_RUN = "run"
+LOGGER_FILE_SIMULATE = "simulate"
+SNAP = "snap"
 WIDTH = 'width'
 JSON_FILE = Path("data.json")
 current_dict = None 

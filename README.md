@@ -118,22 +118,19 @@ python3 GWANN.py train  --help
 Usage: GWANN.py train [OPTIONS]
 
 Options:
-  -M, --MN TEXT         Model name to be saved  [required]
-  -e, --epochs INTEGER  Number of training iterations
-  -S, --SNPs INTEGER    Number of SNP sites to be randomly sampled per simulation
-                        [required]
-  -b, --batch INTEGER   Batch size
-  -l, --lrate float     learning rate for the model
-  -r, --ratio FLOAT     Train/Test ratio
-  -w, --width INTEGER   Image width must be a divisor of the number of
-                        individuals
-  --path TEXT           Path to the simulated data  [required]
-  --mds                 Apply mds transformation on the phenotype matrix, add
-                        TN to avoid population structure
-  --help                Show this message and exit.
-  --geneModel, --GM TEXT     Choose one of the four models, where a value of
-                             2/3 is interpreted as follows: recessive = 0,
-                             dominant = 1, additive = 0.2/3, noHet = 0
+  --help                     Show this message and exit.
+  -M,  --MN TEXT              Model name to be saved  [required]
+  -e,  --epochs INTEGER       Number of training iterations
+  -S,  --SNPs INTEGER         Number of SNP sites to be randomly sampled per simulation [required]  
+  -b,  --batch INTEGER        Batch size
+  -lr, --lrate float          learning rate for the model
+  -r,  --ratio FLOAT          Train/Test ratio 
+  -w,  --width INTEGER        Image width must be a divisor of the number of individuals
+  --path TEXT                Path to the simulated data  [required]
+  --mds                      Apply mds transformation on the phenotype matrix, add
+                             TN to avoid population structure
+  --geneModel, --GM TEXT     Choose one of the four models, where the heterozygote (value = 1) is 
+                             represented as: minor = 0, major = 2, heterozygote = 1, missing = -1.
 ```
 
 ```bash
