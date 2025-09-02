@@ -2,7 +2,7 @@
 - [Create Virtual Environment (Optional)](#create-virtual-environment-optional)
 - [Go into the repository](#go-into-the-repository)
 - [Install python dependencies](#install-python-dependencies)
-- [Install geno command](#install-geno-command)
+- [Install geno command and authorize scripts](#install-geno-command-and-authorize-scripts)
 - [Install real data to test GWANN (Optional)](#install-real-data-to-test-gwann-optional)
   - [Example](#example)
   - [Usage](#usage)
@@ -40,9 +40,10 @@ cd GWANN
 ```bash
 pip install -r requirements.txt 
 ```
-# Install geno command
+# Install geno command and authorize scripts
 ```bash
 chmod u+x dependencies.sh
+chmod u+x clean_images.sh 
 ./dependencies.sh
 ```
 
