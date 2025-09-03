@@ -6,7 +6,7 @@ from train13 import Train
 from run3 import Run
 from utilities import json_get, json_update
 import resource
-from const import SIMULATIONS, LOGGER_DIR, SAMPLES, GENOMEMODEL, SNAP, LOGGER_FILE_TRAIN, LOGGER_FILE_SIMULATE, LOGGER_FILE_RUN, MODEL_NAME
+from const import SIMULATIONS, LOGGER_DIR, SAMPLES, GENOMEMODEL, SNAP, LOGGER_FILE_TRAIN, LOGGER_FILE_SIMULATE, LOGGER_FILE_RUN, MODEL_NAME, CAUSAL_SNPS
 import datetime
 from mylogger import Logger
 import time
@@ -141,7 +141,7 @@ class CLIManager:
             {subpop} subpopulations, {n_samples} samples, \
             {n_snps} causal SNPs, MAF: {maf}, missing data: {miss}, \
             equal variance: {equal}")
-        
+        json_update(CAUSAL_SNPS, n_snps)
         Simulate(pop, subpop, n_samples, n_sim, n_snps, maf, miss, equal, debug, delete).simulate()
         log_resource_usage(start_time,Logger(f'Message:', f"{os.environ['LOGGER']}"), "Simulate")
 
@@ -205,6 +205,9 @@ class CLIManager:
             Logger(f'Error:', f"{os.environ['LOGGER']}").error(f"gene-model {gm} is not recognized, choose one of: minor, major, missing, heterozygote")
             raise ValueError(f"gene-model {gm} is not recognized, choose one of: minor, major, missing, heterozygote")
         
+        if n_snps <= 0 or n_snps <= json_get(CAUSAL_SNPS):
+            Logger(f'Error:', f"{os.environ['LOGGER']}").error(f"Number of SNPs {n_snps} must be a positive integer and greater than the number of causal SNPs {json_get(CAUSAL_SNPS)}")
+            raise ValueError(f"Number of SNPs {n_snps} must be a positive integer and greater than the number of causal SNPs {json_get(CAUSAL_SNPS)}")
         json_update(GENOMEMODEL, gm)
         json_update(SNAP, sp)
 

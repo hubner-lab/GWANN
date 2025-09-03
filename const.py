@@ -2,6 +2,7 @@ from pathlib import Path
 
 SIMULATIONS = "simulations"
 SAMPLES = "samples"
+CAUSAL_SNPS = "causal_snps"
 TOTAL_SNPS = "total_snps"
 MODEL_NAME= "model_name"
 GENOMEMODEL = "gene_model"
