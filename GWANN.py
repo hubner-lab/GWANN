@@ -79,7 +79,8 @@ class CLIManager:
         """
         start_time = time.time()
 
-        modelPath = json_get(MODEL_NAME) 
+        modelPath = json_get(MODEL_NAME)
+        json_update(SNAP, sp) 
         modelPath = modelPath if model is None else model
         os.environ['LOGGER'] = f'{LOGGER_DIR}/{LOGGER_FILE_RUN}_{datetime.datetime.now().strftime("%Y-%m-%d_%H-%M-%S")}.log'
         Logger(f'Message:', f"{os.environ['LOGGER']}").debug(f"Running GWANN analysis with VCF: {vcf}, phenotype path: {pheno_path}, trait: {trait}, model: {modelPath}, output path: {output_path}, threshold: {th}, function: {func}, Snapshots: {sp}")
