@@ -52,6 +52,22 @@ chmod u+x clean_images.sh
 chmod u+x test_data.sh
 ./test_data.sh
 ```
+
+# Install python2 (Optional)
+```bash
+sudo apt update
+sudo apt install build-essential libssl-dev zlib1g-dev \
+libncurses5-dev libbz2-dev libreadline-dev libsqlite3-dev \
+libffi-dev wget
+wget https://www.python.org/ftp/python/2.7.18/Python-2.7.18.tgz
+tar -xzf Python-2.7.18.tgz
+cd Python-2.7.18
+./configure --enable-optimizations
+make -j8
+sudo make altinstall
+sudo ln -s /usr/local/bin/python2.7 /usr/bin/python2
+```
+
 ## Example 
 
 ```bash
