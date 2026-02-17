@@ -158,3 +158,6 @@ Options:
 ```
 ## Net 
 ![net](images/model_visualization_3D.png "net")
+
+## GWANN pipeline 
+![net](images/pipeline.pdf "pipeline")
