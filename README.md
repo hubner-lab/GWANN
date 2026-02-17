@@ -160,4 +160,4 @@ Options:
 ![net](images/model_visualization_3D.png "net")
 
 ## GWANN pipeline 
-![net](images/pipeline.pdf "pipeline")
+![pipeline](images/pipeline.png "pipeline")
