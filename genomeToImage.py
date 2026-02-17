@@ -20,7 +20,7 @@ class GenomeImage:
         if not os.path.isdir(dir_name):
             os.mkdir(dir_name)
         plt.savefig(f"{dir_name}/{image_name}.png")  
-        plt.show() 
+        #plt.show() 
         plt.close()  
 
 
