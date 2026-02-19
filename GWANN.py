@@ -100,7 +100,7 @@ class CLIManager:
     @click.option('-S', '--causal-snps', 'n_snps', default=1, type=int, help="Number of causal SNPs expected per number of SNP-sites")
     @click.option('-m', '--maf', 'maf', default=0.05, type=float, help="Minor allele frequency")
     @click.option('--miss', 'miss', default=0.03, type=float, help="Proportion of missing data")
-    @click.option('--equal-variance', 'equal', default=False, is_flag=True, help="Set this if equal variance is expected among SNPs (ignore for single SNP)")
+    @click.option('--eqvar', 'equal', default=False, is_flag=True, help="Set this if equal variance is expected among SNPs (ignore for single SNP)")
     @click.option('--verbose', 'debug', default=False, is_flag=True, help="Increase verbosity")
     @click.option('--delete', 'delete', default=True, is_flag=True, help="Delete the current simulated files")
     def simulate(
@@ -136,11 +136,7 @@ class CLIManager:
         start_time = time.time()
         os.environ['LOGGER'] = f'{LOGGER_DIR}/{LOGGER_FILE_SIMULATE}_{datetime.datetime.now().strftime("%Y-%m-%d_%H-%M-%S")}.log'
 
-        Logger(f'Message:', f"{os.environ['LOGGER']}").debug(
-            f"Simulating {n_sim} populations with {pop} SNPs, \
-            {subpop} subpopulations, {n_samples} samples, \
-            {n_snps} causal SNPs, MAF: {maf}, missing data: {miss}, \
-            equal variance: {equal}")
+        Logger(f'Message:', f"{os.environ['LOGGER']}").debug(f"Simulating {n_sim} populations with {pop} SNPs,{subpop} subpopulations, {n_samples} samples, {n_snps} causal SNPs, MAF: {maf}, missing data: {miss}, equal variance: {equal}")
         json_update(CAUSAL_SNPS, n_snps)
         Simulate(pop, subpop, n_samples, n_sim, n_snps, maf, miss, equal, debug, delete).simulate()
         log_resource_usage(start_time,Logger(f'Message:', f"{os.environ['LOGGER']}"), "Simulate")
