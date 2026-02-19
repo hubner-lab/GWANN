@@ -113,7 +113,7 @@ Options:
   -S, --causal-snps              INTEGER    Number of causal SNPs expected per number of SNP-sites
   -m, --maf                      FLOAT      Minor allele frequency  0<= maf <= 1  
   --miss                         FLOAT      Proportion of missing data  0<= miss <= 1  
-  --equal-variance               BOOL       Set this if equal variance is expected among SNPs (ignore for single SNP)
+  --eqvar                        BOOL       Set this if equal variance is expected among SNPs (ignore for single SNP)
   --verbose                      BOOL       Increase verbosity
   --delete                       BOOL       Delete the current simulated files
   --help                                    Show this message and exit.
