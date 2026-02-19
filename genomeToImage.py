@@ -15,7 +15,7 @@ class GenomeImage:
     
     
     def plot_sample(self, dir_name,sample, image_name):
-        plt.imshow(sample,  cmap="gray", vmin=0,vmax=1) 
+        plt.imshow(sample,  cmap="viridis", vmin=0,vmax=1) 
         plt.title(image_name) 
         if not os.path.isdir(dir_name):
             os.mkdir(dir_name)
