@@ -177,7 +177,7 @@ class SimulationDataReader:
     def apply_mds_transformation(self):
         """Apply MDS algorithm on the Matrix columns
             returns : vector (1XN) where N is number of individuals in the simulation """
-        embedding = MDS(n_components=1, random_state=0, normalized_stress="auto")
+        embedding = MDS(n_init=4, n_components=1, random_state=0, normalized_stress="auto")
         return embedding.fit_transform(self.geno_data_reordered_pheno.T).T
     
 
