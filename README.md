@@ -67,6 +67,11 @@ make -j8
 sudo make altinstall
 sudo ln -s /usr/local/bin/python2.7 /usr/bin/python2
 ```
+for macOS:
+```
+go to https://www.python.org/downloads/release/python-2718/
+download in install → macOS 64-bit installer
+```
 
 ## Example 
 
